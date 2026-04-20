@@ -1,0 +1,32 @@
+version: "1.0"
+description: "Политики переключения режимов системы"
+policies:
+  - name: "critical_salience"
+    conditions:
+      salience.aggregated:
+        gt: 0.9
+    target_mode: "critical"
+    reason: "Очень высокая значимость"
+
+  - name: "elevated_salience"
+    conditions:
+      salience.aggregated:
+        gt: 0.7
+        lt: 0.9
+    target_mode: "elevated"
+    reason: "Высокая значимость"
+
+  - name: "low_salience"
+    conditions:
+      salience.aggregated:
+        lt: 0.3
+    target_mode: "low"
+    reason: "Низкая значимость"
+
+  - name: "normal_salience"
+    conditions:
+      salience.aggregated:
+        gt: 0.3
+        lt: 0.7
+    target_mode: "normal"
+    reason: "Нормальная значимость"

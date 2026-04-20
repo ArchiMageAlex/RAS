@@ -1,0 +1,150 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ras_user
+      POSTGRES_PASSWORD: ras_password
+      POSTGRES_DB: ras_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api_gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: uvicorn api_gateway.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api_gateway:/app/api_gateway
+      - ./common:/app/common
+      - ./event_bus:/app/event_bus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  salience_engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m salience_engine.consumer
+    depends_on:
+      - kafka
+      - redis
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+    volumes:
+      - ./salience_engine:/app/salience_engine
+      - ./common:/app/common
+      - ./event_bus:/app/event_bus
+
+  mode_manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m mode_manager.consumer
+    depends_on:
+      - kafka
+      - redis
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+    volumes:
+      - ./mode_manager:/app/mode_manager
+      - ./common:/app/common
+
+  interrupt_manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m interrupt_manager.consumer
+    depends_on:
+      - kafka
+      - redis
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+    volumes:
+      - ./interrupt_manager:/app/interrupt_manager
+      - ./common:/app/common
+      - ./policy_engine:/app/policy_engine
+
+  task_orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m task_orchestrator.consumer
+    depends_on:
+      - kafka
+      - redis
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+    volumes:
+      - ./task_orchestrator:/app/task_orchestrator
+      - ./common:/app/common
+      - ./workspace_service:/app/workspace_service
+      - ./retriever_agent:/app/retriever_agent
+
+  retriever_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m retriever_agent.consumer
+    depends_on:
+      - kafka
+      - redis
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+    volumes:
+      - ./retriever_agent:/app/retriever_agent
+      - ./common:/app/common
+
+volumes:
+  postgres_data:

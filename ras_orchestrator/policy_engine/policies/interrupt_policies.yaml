@@ -1,0 +1,40 @@
+version: "1.0"
+description: "Политики прерывания задач"
+policies:
+  - name: "high_risk_security"
+    conditions:
+      event.type: "security_alert"
+      salience.risk:
+        gt: 0.8
+    reason: "Высокий риск безопасности"
+    priority: 10
+    action: "interrupt"
+
+  - name: "critical_payment_outage"
+    conditions:
+      event.type: "payment_outage"
+      event.severity: "critical"
+      salience.aggregated:
+        gt: 0.9
+    reason: "Критический сбой платежей"
+    priority: 9
+    action: "interrupt"
+
+  - name: "elevated_mode_high_salience"
+    conditions:
+      current_mode: "elevated"
+      salience.aggregated:
+        gt: 0.7
+    reason: "Повышенный режим и высокая значимость"
+    priority: 5
+    action: "interrupt"
+
+  - name: "too_many_active_tasks"
+    conditions:
+      active_task_count:
+        gt: 5
+      salience.urgency:
+        gt: 0.6
+    reason: "Перегрузка активными задачами"
+    priority: 3
+    action: "interrupt"
