@@ -180,7 +180,7 @@ class InterruptManager:
             checkpoint = TaskCheckpoint(
                 task_id=task.task_id,
                 checkpoint_data={
-                    "task": task.model_dump(),
+                    "task": task.model_dump(mode='json'),
                     "progress": task.parameters.get("progress", 0),
                     "state": "interrupted",
                 },

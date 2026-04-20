@@ -151,7 +151,7 @@ class IntegrationCoordinator:
         )
         self.producer = KafkaProducer(
             bootstrap_servers=self.kafka_bootstrap_servers,
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            value_serializer=lambda v: json.dumps(v, default=str).encode("utf-8"),
             acks="all",
             retries=3,
         )
@@ -200,7 +200,7 @@ class IntegrationCoordinator:
                     logger.info(f"Retry {attempt} for event {event.event_id} after {delay}s")
                     time.sleep(delay)
 
-                future = self.producer.send(topic, event.model_dump())
+                future = self.producer.send(topic, event.model_dump(mode='json'))
                 record_metadata = future.get(timeout=10)
                 result = {
                     "success": True,
@@ -218,7 +218,7 @@ class IntegrationCoordinator:
 
         # Все попытки исчерпаны -> отправляем в DLQ
         dlq_entry = {
-            "event": event.model_dump(),
+            "event": event.model_dump(mode='json'),
             "error_type": type(last_error).__name__,
             "error_message": str(last_error),
             "idempotency_key": idempotency_key,

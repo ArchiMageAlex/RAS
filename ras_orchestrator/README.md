@@ -23,106 +23,179 @@ git clone https://github.com/your-org/ras-orchestrator.git
 cd ras_orchestrator
 ```
 
-### 2. Запуск инфраструктуры через Docker Compose
+### 2. Установка зависимостей
+
+```bash
+pip install -r requirements.txt
+```
+
+**Основные зависимости:**
+- `fastapi` — REST API
+- `pydantic` — валидация данных
+- `redis` — workspace service
+- `prometheus-client` — метрики
+- `python-json-logger` — структурированное логирование
+
+**Опциональные зависимости (для полной функциональности):**
+- `opentelemetry-*` — трассировка и метрики
+- `watchdog` — hot-reload политик
+- `jsonschema` — валидация YAML-политик
+
+### 3. Запуск инфраструктуры (опционально)
+
+Для работы с Redis и другими сервисами:
 
 ```bash
 docker-compose up -d
 ```
 
 Запустятся:
-- Zookeeper (2181)
-- Kafka (9092)
-- Redis (6379)
-- PostgreSQL (5432)
-- API Gateway (8000)
-- Observability стек (Prometheus, Grafana, Loki, Jaeger)
+- **Redis** (6379) — workspace service
+- **Kafka** (9092) — event bus (опционально)
+- **PostgreSQL** (5432) — персистентное хранилище (опционально)
 
-### 3. Проверка зависимостей
+### 4. Запуск end-to-end сценария
 
 ```bash
-python check_deps.py
+python run_scenario.py
 ```
 
-### 4. Отправка тестового события
+Сценарий демонстрирует полный цикл обработки события:
+1. Создание события `payment_outage` с критическим уровнем
+2. Оценка значимости (Salience Engine)
+3. Определение режима системы (Mode Manager)
+4. Проверка необходимости прерывания (Interrupt Manager)
+5. Создание и выполнение задачи (Task Orchestrator + Retriever Agent)
+6. Сохранение состояния в workspace (Redis)
+
+### 5. Отправка события через API
 
 ```bash
 curl -X POST http://localhost:8000/events \
-  -H "X-API-Key: dev-key-123" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "test-1",
-    "source": "test",
-    "severity": 0.8,
-    "urgency": 0.7,
-    "impact": 0.9
+    "type": "payment_outage",
+    "severity": "critical",
+    "source": "payment_gateway",
+    "payload": {
+      "service": "payment_gateway",
+      "region": "eu-west-1",
+      "error_rate": 0.95
+    }
   }'
 ```
 
-### 5. Мониторинг
+### 6. Проверка здоровья API
 
+```bash
+curl http://localhost:8000/health
+```
+
+### 7. Мониторинг
+
+- **Prometheus метрики**: http://localhost:9090
 - **Grafana**: http://localhost:3000 (логин: admin, пароль: admin)
-- **Jaeger**: http://localhost:16686
-- **Prometheus**: http://localhost:9090
+- **Jaeger** (трассировка): http://localhost:16686
 
 ## 🏗️ Архитектура
 
 Проект состоит из следующих core‑компонентов:
 
-1. **API Gateway (FastAPI)** – приём событий через REST API.
-2. **Salience Engine** – оценка значимости событий по трём измерениям (severity, urgency, impact) и дополнительным факторам.
-3. **Mode Manager** – управление глобальным режимом системы (low, normal, elevated, critical) с гистерезисом.
-4. **Interrupt Manager** – принятие решений о прерывании текущих задач, checkpointing, восстановление.
-5. **Workspace Service (Redis)** – общее рабочее пространство для хранения состояния, чекпоинтов, очередей задач.
-6. **Policy Engine** – декларативные политики прерывания и переключения режимов (YAML DSL), веб‑интерфейс.
-7. **Task Orchestrator** – создание задач и назначение агентов.
-8. **Retriever Agent** – базовый агент для выполнения задач, интеграция с LLM.
-9. **Observability Stack** – OpenTelemetry, Prometheus, Grafana, Loki, Jaeger для мониторинга, логирования и трассировки.
+| Компонент | Описание |
+|-----------|----------|
+| **API Gateway** (FastAPI) | Приём событий через REST API |
+| **Salience Engine** | Оценка значимости событий по 5 измерениям: relevance, novelty, risk, urgency, uncertainty |
+| **Mode Manager** | Управление глобальным режимом системы (low, normal, elevated, critical) с гистерезисом и cooldown |
+| **Interrupt Manager** | Принятие решений о прерывании текущих задач, checkpointing, восстановление |
+| **Workspace Service** (Redis) | Общее рабочее пространство для хранения состояния, чекпоинтов, очередей задач |
+| **Policy Engine** | Декларативные политики прерывания и переключения режимов (YAML DSL) |
+| **Task Orchestrator** | Создание задач и назначение агентов |
+| **Retriever Agent** | Базовый агент для выполнения задач retrieval |
+| **Event Bus** (Kafka) | Шина событий для асинхронной коммуникации |
+| **Observability Stack** | OpenTelemetry, Prometheus, Grafana, Jaeger для мониторинга |
 
 ## 🔧 Технологический стек
 
 - **Языки**: Python 3.11+
-- **Фреймворки**: FastAPI (REST API), Pydantic (валидация), SQLAlchemy (ORM)
+- **Фреймворки**: FastAPI (REST API), Pydantic (валидация), asyncio
 - **Инфраструктура**: Apache Kafka (event bus), Redis (workspace), PostgreSQL (persistent storage)
 - **Контейнеризация**: Docker & Docker Compose
 - **Оркестрация**: Kubernetes (production)
-- **Observability**: OpenTelemetry, Prometheus, Grafana, Loki, Jaeger
+- **Observability**: OpenTelemetry, Prometheus, Grafana, Jaeger
 - **CI/CD**: GitHub Actions
 
 ## 📖 Политики
 
 Политики определены в YAML‑файлах в `policy_engine/policies/`:
 
-- `interrupt_policies.yaml` – правила прерывания
-- `mode_policies.yaml` – правила переключения режимов
-- `action_policies.yaml` – действия при срабатывании политик
-- `tool_access_policies.yaml` – контроль доступа к инструментам
-- `human_escalation_policies.yaml` – эскалация к человеку
-- `routing_policies.yaml` – маршрутизация событий
+| Файл | Назначение |
+|------|------------|
+| `interrupt_policies.yaml` | Правила прерывания задач |
+| `mode_policies.yaml` | Правила переключения режимов |
+| `action_policies.yaml` | Действия при срабатывании политик |
+| `tool_access_policies.yaml` | Контроль доступа к инструментам |
+| `human_escalation_policies.yaml` | Эскалация к человеку |
+| `routing_policies.yaml` | Маршрутизация событий |
 
-Управление политиками через веб‑интерфейс (http://localhost:8001) или REST API.
+Пример политики (`interrupt_policies.yaml`):
+
+```yaml
+policies:
+  - name: critical_payment_outage
+    version: "1.0"
+    description: "Прерывание всех задач при критическом сбое платежей"
+    enabled: true
+    priority: 90
+    conditions:
+      all:
+        - event.type: payment_outage
+        - event.severity: critical
+        - salience.aggregated:
+            gt: 0.8
+    actions:
+      action: interrupt
+      reason: critical_payment_outage
+      interrupt_type: hard
+      checkpoint: true
+```
 
 ## 📊 Observability
 
-- **Логирование**: структурированные JSON‑логи через python‑json‑logger, сбор в Loki.
-- **Метрики**: Prometheus‑метрики доступны на порту 9090.
-  - `ras_events_total` – количество событий по типам
-  - `ras_salience_score` – распределение salience score
-  - `ras_interrupt_decisions_total` – решения о прерывании
-  - `ras_mode_transitions_total` – переходы режимов
-- **Трассировка**: Распределённые трассировки через Jaeger.
+### Логирование
+- Структурированные JSON-логи через `python-json-logger`
+- Корреляция с trace_id и span_id из OpenTelemetry
+- Сбор логов в Loki (при использовании полного стека)
+
+### Метрики Prometheus
+- `ras_events_total{event_type, severity}` — количество событий
+- `ras_salience_score` — распределение salience score
+- `ras_interrupt_decisions_total{decision, reason}` — решения о прерывании
+- `ras_mode_transitions_total{from, to}` — переходы режимов
+
+### Трассировка
+- Распределённые трассировки через Jaeger
+- Корреляция запросов через `X-Correlation-ID`
 
 ## 🧪 Тестирование
 
 Запустите модульные и интеграционные тесты:
 
 ```bash
-pytest tests/
+pytest tests/ -v
 ```
 
-## 📈 Дальнейшие шаги (фазы 2 и 3)
+## 📈 Roadmap
 
-- **Фаза 2**: Adaptive Attention – novelty detection, checkpoint/resume, trust scoring, human escalation.
-- **Фаза 3**: Self‑Optimizing – RL для динамической настройки порогов, predictive processing, homeostatic control.
+### Фаза 2: Adaptive Attention
+- [ ] Novelty detection на основе historical events
+- [ ] Checkpoint/resume для длинных задач
+- [ ] Trust scoring для источников событий
+- [ ] Human escalation workflows
+
+### Фаза 3: Self-Optimizing
+- [ ] Reinforcement Learning для динамической настройки порогов
+- [ ] Predictive processing на основе временных паттернов
+- [ ] Homeostatic control для баланса нагрузки
 
 ## 📄 Лицензия
 

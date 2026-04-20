@@ -6,7 +6,7 @@ Consumer для Salience Engine.
 import logging
 import time
 from common.utils import setup_logging
-from common.telemetry import init_observability, get_tracer, business_metrics
+from common.telemetry import init_observability, get_tracer, business_metrics, system_metrics
 from .engine import get_salience_engine
 
 # Initialize observability
@@ -20,18 +20,27 @@ engine = get_salience_engine()
 
 def process_event(event):
     """Обработка одного события."""
-    with tracer.start_as_current_span("process_event") as span:
-        span.set_attribute("event.id", event.event_id)
+    from contextlib import nullcontext
+    span = None
+    context_manager = tracer.start_as_current_span("process_event") if tracer else nullcontext()
+    
+    with context_manager as active_span:
+        span = active_span
+        if span:
+            span.set_attribute("event.id", event.event_id)
         try:
             score = engine.compute(event)
             # Здесь должна быть публикация в Kafka
             # await produce_salience_score(event.event_id, score)
-            business_metrics["interrupt_rate"].add(1, {"type": "event_processed"})
+            if business_metrics and "interrupt_rate" in business_metrics:
+                business_metrics["interrupt_rate"].add(1, {"type": "event_processed"})
             logger.info(f"Processed event {event.event_id}, score: {score.aggregated:.3f}")
         except Exception as e:
             logger.error(f"Error processing event {event.event_id}: {e}")
-            span.record_exception(e)
-            business_metrics["service_error_rate"].add(1)
+            if span:
+                span.record_exception(e)
+            if system_metrics and "service_error_rate" in system_metrics:
+                system_metrics["service_error_rate"].add(1)
             raise
 
 def simulate_consumption():

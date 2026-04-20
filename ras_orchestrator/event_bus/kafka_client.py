@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from typing import Optional
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
@@ -9,8 +10,8 @@ from common.models import Event
 logger = logging.getLogger(__name__)
 
 # Конфигурация Kafka (заглушка, будет переопределена через переменные окружения)
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
-EVENT_TOPIC = "ras_events"
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+EVENT_TOPIC = os.getenv("KAFKA_EVENT_TOPIC", "ras_events")
 
 _producer: Optional[KafkaProducer] = None
 
@@ -18,10 +19,11 @@ _producer: Optional[KafkaProducer] = None
 def get_producer():
     global _producer
     if _producer is None:
+        logger.info(f"Attempting to connect to Kafka at {KAFKA_BOOTSTRAP_SERVERS}")
         try:
             _producer = KafkaProducer(
                 bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+                value_serializer=lambda v: json.dumps(v, default=str).encode("utf-8"),
                 acks="all",
                 retries=3,
             )
@@ -36,7 +38,7 @@ async def produce_event(event: Event):
     """Асинхронно отправляет событие в Kafka."""
     producer = get_producer()
     try:
-        event_dict = event.model_dump()
+        event_dict = event.model_dump(mode='json')
         future = producer.send(EVENT_TOPIC, event_dict)
         # Блокируем для простоты (в реальности можно использовать callback)
         result = future.get(timeout=10)
