@@ -1,35 +1,25 @@
-# RAS-like Orchestrator MVP
+# RAS-like Orchestrator
 
 Минимально жизнеспособная версия оркестратора, реализующего принципы Reticular Activating System (RAS) для селективного внимания и прерывания задач.
 
-## Архитектура
+## 📚 Полная документация
 
-Проект состоит из следующих core-компонентов:
+Полная документация находится в директории [`docs/`](docs/README.md). Она включает:
 
-1. **API Gateway (FastAPI)** – приём событий через REST API.
-2. **Salience Engine** – оценка значимости событий по пяти измерениям (релевантность, новизна, риск, срочность, неопределённость).
-3. **Mode Manager** – управление глобальным режимом системы (low, normal, elevated, critical).
-4. **Interrupt Manager** – принятие решений о прерывании текущих задач.
-5. **Workspace Service (Redis)** – общее рабочее пространство для хранения состояния.
-6. **Policy Engine** – декларативные политики прерывания и переключения режимов (YAML).
-7. **Task Orchestrator** – создание задач и назначение агентов.
-8. **Retriever Agent** – базовый агент для поиска информации.
+- **Архитектура** — обзор системы, компоненты, data model.
+- **API** — OpenAPI спецификация, примеры запросов.
+- **Развёртывание** — Docker Compose, Kubernetes, production guide.
+- **Операции** — мониторинг, troubleshooting, maintenance.
+- **Разработка** — настройка окружения, code style, CI/CD.
+- **Руководство пользователя** — быстрый старт, use cases, best practices.
+- **Справочные материалы** — глоссарий, FAQ, чеклисты.
 
-## Технологический стек
-
-- Python 3.11+
-- FastAPI (REST API)
-- Apache Kafka (event bus)
-- Redis (workspace)
-- PostgreSQL (persistent storage, заготовка)
-- Docker & Docker Compose
-- OpenTelemetry/Prometheus (observability)
-
-## Быстрый старт
+## 🚀 Быстрый старт
 
 ### 1. Клонирование и настройка
 
 ```bash
+git clone https://github.com/your-org/ras-orchestrator.git
 cd ras_orchestrator
 ```
 
@@ -45,136 +35,95 @@ docker-compose up -d
 - Redis (6379)
 - PostgreSQL (5432)
 - API Gateway (8000)
+- Observability стек (Prometheus, Grafana, Loki, Jaeger)
 
-### 3. Установка зависимостей (для локальной разработки)
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Проверка зависимостей
+### 3. Проверка зависимостей
 
 ```bash
 python check_deps.py
 ```
 
-Если отсутствуют какие-либо пакеты, скрипт сообщит и предложит установить.
-
-### 5. Запуск end-to-end сценария
-
-```bash
-python run_scenario.py
-```
-
-Сценарий имитирует событие `payment_outage` с критической severity и проходит через весь конвейер:
-- Создание события
-- Оценка значимости
-- Определение режима
-- Решение о прерывании
-- Создание задачи
-- Выполнение агентом
-- Сохранение в workspace
-
-## API Endpoints
-
-### API Gateway
-- `POST /events` – приём события
-- `GET /health` – проверка здоровья
-
-Пример запроса:
+### 4. Отправка тестового события
 
 ```bash
 curl -X POST http://localhost:8000/events \
+  -H "X-API-Key: dev-key-123" \
   -H "Content-Type: application/json" \
   -d '{
-    "type": "payment_outage",
-    "severity": "critical",
-    "source": "payment_service",
-    "payload": {"error_rate": 0.95}
+    "event_id": "test-1",
+    "source": "test",
+    "severity": 0.8,
+    "urgency": 0.7,
+    "impact": 0.9
   }'
 ```
 
-## Политики
+### 5. Мониторинг
 
-Политики определены в YAML-файлах:
+- **Grafana**: http://localhost:3000 (логин: admin, пароль: admin)
+- **Jaeger**: http://localhost:16686
+- **Prometheus**: http://localhost:9090
 
-- `policy_engine/policies/interrupt_policies.yaml` – правила прерывания
-- `policy_engine/policies/mode_policies.yaml` – правила переключения режимов
+## 🏗️ Архитектура
 
-Пример политики прерывания:
-```yaml
-- name: "high_risk_security"
-  conditions:
-    event.type: "security_alert"
-    salience.risk:
-      gt: 0.8
-  reason: "Высокий риск безопасности"
-  priority: 10
-  action: "interrupt"
-```
+Проект состоит из следующих core‑компонентов:
 
-## Observability
+1. **API Gateway (FastAPI)** – приём событий через REST API.
+2. **Salience Engine** – оценка значимости событий по трём измерениям (severity, urgency, impact) и дополнительным факторам.
+3. **Mode Manager** – управление глобальным режимом системы (low, normal, elevated, critical) с гистерезисом.
+4. **Interrupt Manager** – принятие решений о прерывании текущих задач, checkpointing, восстановление.
+5. **Workspace Service (Redis)** – общее рабочее пространство для хранения состояния, чекпоинтов, очередей задач.
+6. **Policy Engine** – декларативные политики прерывания и переключения режимов (YAML DSL), веб‑интерфейс.
+7. **Task Orchestrator** – создание задач и назначение агентов.
+8. **Retriever Agent** – базовый агент для выполнения задач, интеграция с LLM.
+9. **Observability Stack** – OpenTelemetry, Prometheus, Grafana, Loki, Jaeger для мониторинга, логирования и трассировки.
 
-- **Логирование**: структурированные JSON-логи через python-json-logger.
-- **Метрики**: Prometheus-метрики доступны на порту 9090 (если запущен сервер метрик).
+## 🔧 Технологический стек
+
+- **Языки**: Python 3.11+
+- **Фреймворки**: FastAPI (REST API), Pydantic (валидация), SQLAlchemy (ORM)
+- **Инфраструктура**: Apache Kafka (event bus), Redis (workspace), PostgreSQL (persistent storage)
+- **Контейнеризация**: Docker & Docker Compose
+- **Оркестрация**: Kubernetes (production)
+- **Observability**: OpenTelemetry, Prometheus, Grafana, Loki, Jaeger
+- **CI/CD**: GitHub Actions
+
+## 📖 Политики
+
+Политики определены в YAML‑файлах в `policy_engine/policies/`:
+
+- `interrupt_policies.yaml` – правила прерывания
+- `mode_policies.yaml` – правила переключения режимов
+- `action_policies.yaml` – действия при срабатывании политик
+- `tool_access_policies.yaml` – контроль доступа к инструментам
+- `human_escalation_policies.yaml` – эскалация к человеку
+- `routing_policies.yaml` – маршрутизация событий
+
+Управление политиками через веб‑интерфейс (http://localhost:8001) или REST API.
+
+## 📊 Observability
+
+- **Логирование**: структурированные JSON‑логи через python‑json‑logger, сбор в Loki.
+- **Метрики**: Prometheus‑метрики доступны на порту 9090.
   - `ras_events_total` – количество событий по типам
   - `ras_salience_score` – распределение salience score
   - `ras_interrupt_decisions_total` – решения о прерывании
   - `ras_mode_transitions_total` – переходы режимов
+- **Трассировка**: Распределённые трассировки через Jaeger.
 
-Для запуска сервера метрик выполните в коде:
-```python
-from common.utils import start_metrics_server
-start_metrics_server(9090)
-```
+## 🧪 Тестирование
 
-## Разработка
-
-### Структура проекта
-
-```
-ras_orchestrator/
-├── api_gateway/          # FastAPI приложение
-├── salience_engine/      # Salience Engine
-├── mode_manager/         # Mode Manager
-├── interrupt_manager/    # Interrupt Manager
-├── workspace_service/    # Redis клиент
-├── policy_engine/        # Policy Engine + YAML политики
-├── task_orchestrator/    # Task Orchestrator
-├── retriever_agent/      # Retriever Agent
-├── event_bus/            # Kafka клиент
-├── common/               # Общие модели и утилиты
-├── docker-compose.yml    # Конфигурация Docker Compose
-├── Dockerfile            # Образ для сервисов
-├── requirements.txt      # Зависимости Python
-├── run_scenario.py       # End-to-end сценарий
-├── check_deps.py         # Проверка зависимостей
-└── README.md             # Эта документация
-```
-
-### Добавление нового агента
-
-1. Создайте модуль в `agents/your_agent/`
-2. Реализуйте метод `execute(task)`
-3. Зарегистрируйте агента в Task Orchestrator
-
-### Расширение политик
-
-Добавьте новые правила в соответствующие YAML-файлы. Policy Engine автоматически загрузит их при старте.
-
-## Тестирование
-
-Запустите модульные тесты (будут добавлены позже):
+Запустите модульные и интеграционные тесты:
 
 ```bash
 pytest tests/
 ```
 
-## Дальнейшие шаги (фазы 2 и 3)
+## 📈 Дальнейшие шаги (фазы 2 и 3)
 
 - **Фаза 2**: Adaptive Attention – novelty detection, checkpoint/resume, trust scoring, human escalation.
-- **Фаза 3**: Self-Optimizing – RL для динамической настройки порогов, predictive processing, homeostatic control.
+- **Фаза 3**: Self‑Optimizing – RL для динамической настройки порогов, predictive processing, homeostatic control.
 
-## Лицензия
+## 📄 Лицензия
 
 MIT

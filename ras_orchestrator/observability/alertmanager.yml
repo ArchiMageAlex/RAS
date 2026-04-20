@@ -1,0 +1,59 @@
+global:
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alertmanager@ras-orchestrator.com'
+  smtp_auth_username: 'user@gmail.com'
+  smtp_auth_password: 'password'
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'slack-notifications'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      continue: true
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      continue: false
+
+receivers:
+  - name: 'slack-notifications'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/XXXX/YYYY/ZZZZ'
+        channel: '#alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.summary }} - {{ .CommonAnnotations.description }}'
+        send_resolved: true
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'admin@ras-orchestrator.com'
+        from: 'alertmanager@ras-orchestrator.com'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: 'user@gmail.com'
+        auth_password: 'password'
+        headers:
+          subject: '[CRITICAL] {{ .GroupLabels.alertname }}'
+        html: '{{ .CommonAnnotations.description }}'
+    webhook_configs:
+      - url: 'http://webhook-handler:8080/alerts'
+        send_resolved: true
+
+  - name: 'warning-alerts'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/XXXX/YYYY/ZZZZ'
+        channel: '#alerts-warnings'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.summary }}'
+        send_resolved: true
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'component']

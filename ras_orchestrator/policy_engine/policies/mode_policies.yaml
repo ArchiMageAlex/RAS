@@ -1,32 +1,70 @@
-version: "1.0"
+version: "2.0"
 description: "Политики переключения режимов системы"
 policies:
   - name: "critical_salience"
+    version: "1.0"
+    enabled: true
+    priority: 10
     conditions:
       salience.aggregated:
         gt: 0.9
-    target_mode: "critical"
-    reason: "Очень высокая значимость"
+    actions:
+      target_mode: "critical"
+      reason: "Очень высокая значимость"
+      hysteresis: 0.1
+    metadata:
+      category: "salience"
 
   - name: "elevated_salience"
+    version: "1.0"
+    enabled: true
+    priority: 5
     conditions:
-      salience.aggregated:
-        gt: 0.7
-        lt: 0.9
-    target_mode: "elevated"
-    reason: "Высокая значимость"
+      all:
+        - salience.aggregated:
+            gt: 0.7
+        - salience.aggregated:
+            lt: 0.9
+    actions:
+      target_mode: "elevated"
+      reason: "Высокая значимость"
+      hysteresis: 0.05
 
   - name: "low_salience"
+    version: "1.0"
+    enabled: true
+    priority: 2
     conditions:
       salience.aggregated:
         lt: 0.3
-    target_mode: "low"
-    reason: "Низкая значимость"
+    actions:
+      target_mode: "low"
+      reason: "Низкая значимость"
 
   - name: "normal_salience"
+    version: "1.0"
+    enabled: true
+    priority: 3
     conditions:
-      salience.aggregated:
-        gt: 0.3
-        lt: 0.7
-    target_mode: "normal"
-    reason: "Нормальная значимость"
+      all:
+        - salience.aggregated:
+            gt: 0.3
+        - salience.aggregated:
+            lt: 0.7
+    actions:
+      target_mode: "normal"
+      reason: "Нормальная значимость"
+
+  - name: "idle_on_low_activity"
+    version: "1.0"
+    enabled: true
+    priority: 1
+    conditions:
+      all:
+        - active_task_count:
+            eq: 0
+        - salience.aggregated:
+            lt: 0.1
+    actions:
+      target_mode: "idle"
+      reason: "Отсутствие активности"

@@ -1,0 +1,50 @@
+version: "1.0"
+description: "Политики контроля действий агентов"
+policies:
+  - name: "prevent_destructive_actions"
+    version: "1.0"
+    enabled: true
+    priority: 10
+    tags: ["safety", "destructive"]
+    conditions:
+      all:
+        - agent.role: "automation"
+        - action.type:
+            in: ["delete", "drop", "truncate", "shutdown"]
+    actions:
+      allowed_actions: []
+      denied_actions: ["delete", "drop", "truncate", "shutdown"]
+      require_approval: true
+    metadata:
+      category: "safety"
+
+  - name: "allow_read_only_for_guests"
+    version: "1.0"
+    enabled: true
+    priority: 5
+    conditions:
+      all:
+        - agent.role: "guest"
+        - action.type:
+            in: ["read", "query", "list"]
+    actions:
+      allowed_actions: ["read", "query", "list"]
+      denied_actions: ["write", "update", "delete"]
+      require_approval: false
+
+  - name: "restrict_high_cost_operations"
+    version: "1.0"
+    enabled: true
+    priority: 8
+    conditions:
+      any:
+        - action.estimated_cost:
+            gt: 1000
+        - action.resource_usage:
+            gt: 0.8
+    actions:
+      allowed_actions: []
+      denied_actions: []
+      require_approval: true
+    metadata:
+      note: "Требуется одобрение для дорогостоящих операций"

@@ -1,0 +1,561 @@
+openapi: 3.0.3
+info:
+  title: RAS-like Orchestrator API
+  description: |
+    API для взаимодействия с RAS-like оркестратором.
+    Включает endpoints для приёма событий, управления политиками, мониторинга состояния.
+  version: 0.1.0
+  contact:
+    name: RAS Team
+    email: ras-team@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Локальный сервер разработки
+  - url: https://api.ras.example.com
+    description: Production сервер
+
+tags:
+  - name: events
+    description: Приём и управление событиями
+  - name: policies
+    description: Управление политиками прерывания и режимов
+  - name: system
+    description: Мониторинг состояния системы
+  - name: tasks
+    description: Управление задачами
+  - name: observability
+    description: Метрики и трассировка
+
+paths:
+  /events:
+    post:
+      tags:
+        - events
+      summary: Приём нового события
+      description: |
+        Принимает событие от внешней системы, валидирует его и публикует в событийную шину (Kafka).
+        Возвращает уникальный идентификатор события и статус принятия.
+      operationId: ingestEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRequest'
+      responses:
+        '200':
+          description: Событие успешно принято
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '400':
+          description: Невалидные данные события
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Ошибка при публикации в Kafka
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - apiKey: []
+
+  /health:
+    get:
+      tags:
+        - system
+      summary: Проверка здоровья системы
+      description: Возвращает текущий статус сервиса и timestamp.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Сервис здоров
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /metrics:
+    get:
+      tags:
+        - observability
+      summary: Метрики Prometheus
+      description: Возвращает метрики в формате Prometheus.
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Метрики в текстовом формате
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /policies:
+    get:
+      tags:
+        - policies
+      summary: Список всех политик
+      description: Возвращает список всех загруженных политик сгруппированных по типам.
+      operationId: listAllPolicies
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  policies:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Policy'
+
+  /policies/types:
+    get:
+      tags:
+        - policies
+      summary: Список типов политик
+      description: Возвращает поддерживаемые типы политик.
+      operationId: listPolicyTypes
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyTypes'
+
+  /policies/files:
+    get:
+      tags:
+        - policies
+      summary: Список файлов политик
+      description: Возвращает имена YAML файлов с политиками.
+      operationId: listPolicyFiles
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: string
+
+  /policies/file/{filename}:
+    get:
+      tags:
+        - policies
+      summary: Получить содержимое файла политик
+      description: Возвращает содержимое указанного YAML файла.
+      operationId: getPolicyFile
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Имя файла (например, interrupt_policies.yaml)
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Файл не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /policies/evaluate:
+    post:
+      tags:
+        - policies
+      summary: Оценка политик для заданного контекста
+      description: Оценивает политики определённого типа на основе предоставленного контекста.
+      operationId: evaluatePolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateRequest'
+      responses:
+        '200':
+          description: Результат оценки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluateResponse'
+
+  /policies/reload:
+    post:
+      tags:
+        - policies
+      summary: Перезагрузка политик
+      description: Принудительно перезагружает политики из файлов (hot-reload).
+      operationId: reloadPolicies
+      responses:
+        '200':
+          description: Политики перезагружены
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+  /tasks:
+    get:
+      tags:
+        - tasks
+      summary: Список задач
+      description: Возвращает список задач с возможностью фильтрации по статусу.
+      operationId: listTasks
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, running, completed, failed, interrupted]
+          description: Фильтр по статусу задачи
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+          description: Максимальное количество задач
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+
+  /tasks/{task_id}:
+    get:
+      tags:
+        - tasks
+      summary: Получить задачу по ID
+      description: Возвращает детали задачи.
+      operationId: getTask
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: UUID задачи
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          description: Задача не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /mode/current:
+    get:
+      tags:
+        - system
+      summary: Текущий режим системы
+      description: Возвращает текущий режим системы (low, normal, elevated, critical).
+      operationId: getCurrentMode
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mode'
+
+  /interrupt/stats:
+    get:
+      tags:
+        - system
+      summary: Статистика прерываний
+      description: Возвращает статистику по прерываниям (количество решений, срабатываний, типы).
+      operationId: getInterruptStats
+      responses:
+        '200':
+          description: Успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterruptStats'
+
+components:
+  schemas:
+    EventRequest:
+      type: object
+      required:
+        - type
+        - severity
+        - source
+      properties:
+        type:
+          $ref: '#/components/schemas/EventType'
+        severity:
+          $ref: '#/components/schemas/Severity'
+        source:
+          type: string
+          example: "payment_service"
+        payload:
+          type: object
+          additionalProperties: true
+          description: Дополнительные данные события
+          example: {"error_rate": 0.95, "region": "us-east-1"}
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Метаданные (например, origin, correlation_id)
+          example: {"origin": "monitoring", "correlation_id": "abc123"}
+
+    EventResponse:
+      type: object
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8"
+        status:
+          type: string
+          example: "accepted"
+        message:
+          type: string
+          example: "Event is being processed."
+
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-01T12:00:00Z"
+        components:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            kafka: "healthy"
+            redis: "healthy"
+            postgres: "healthy"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Event ingestion failed."
+        detail:
+          type: string
+          example: "Kafka broker unavailable"
+        code:
+          type: integer
+          example: 500
+
+    Policy:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "high_risk_security"
+        version:
+          type: string
+          example: "1.0"
+        enabled:
+          type: boolean
+          example: true
+        priority:
+          type: integer
+          example: 10
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["security", "high_priority"]
+        conditions:
+          type: object
+          additionalProperties: true
+        actions:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    PolicyTypes:
+      type: object
+      properties:
+        types:
+          type: array
+          items:
+            type: string
+          example: ["interrupt", "mode", "action", "tool_access", "human_escalation", "routing"]
+
+    EvaluateRequest:
+      type: object
+      required:
+        - policy_type
+        - context
+      properties:
+        policy_type:
+          type: string
+          example: "interrupt"
+        context:
+          type: object
+          additionalProperties: true
+          example:
+            event:
+              type: "security_alert"
+              severity: "critical"
+            salience:
+              risk: 0.9
+            current_mode: "normal"
+            active_task_count: 3
+
+    EvaluateResponse:
+      type: object
+      properties:
+        matched:
+          type: boolean
+          example: true
+        policies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Policy'
+        actions:
+          type: object
+          additionalProperties: true
+          example:
+            action: "interrupt"
+            reason: "Высокий риск безопасности"
+
+    Task:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        agent_type:
+          type: string
+          example: "retriever"
+        status:
+          type: string
+          enum: [pending, running, completed, failed, interrupted]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        parameters:
+          type: object
+          additionalProperties: true
+        result:
+          type: object
+          additionalProperties: true
+
+    Mode:
+      type: object
+      properties:
+        current_mode:
+          type: string
+          enum: [low, normal, elevated, critical]
+          example: "normal"
+        last_transition:
+          type: string
+          format: date-time
+        manual_lock:
+          type: boolean
+          example: false
+
+    InterruptStats:
+      type: object
+      properties:
+        total_decisions:
+          type: integer
+          example: 150
+        interrupts_triggered:
+          type: integer
+          example: 42
+        interrupt_rate:
+          type: number
+          format: float
+          example: 0.28
+        by_type:
+          type: object
+          additionalProperties:
+            type: integer
+          example:
+            soft: 30
+            hard: 10
+            delayed: 2
+        checkpoint_count:
+          type: integer
+          example: 25
+
+    EventType:
+      type: string
+      enum:
+        - payment_outage
+        - security_alert
+        - performance_degradation
+        - user_complaint
+        - system_health
+        - custom
+
+    Severity:
+      type: string
+      enum:
+        - low
+        - medium
+        - high
+        - critical
+
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API ключ для аутентификации

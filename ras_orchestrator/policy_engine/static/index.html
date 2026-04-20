@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Policy Engine Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body { padding: 20px; background-color: #f8f9fa; }
+        .card { margin-bottom: 20px; }
+        .policy-item { border-left: 4px solid #007bff; padding-left: 10px; margin-bottom: 10px; }
+        .matched { border-left-color: #28a745; }
+        .unmatched { border-left-color: #dc3545; }
+        .json-view { background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Policy Engine Dashboard</h1>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Policy Types</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul id="policyTypes" class="list-group">
+                            <li class="list-group-item">Loading...</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Policy Files</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul id="policyFiles" class="list-group">
+                            <li class="list-group-item">Loading...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Evaluate Policy</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="policyType" class="form-label">Policy Type</label>
+                            <select id="policyType" class="form-select">
+                                <option value="interrupt">Interrupt</option>
+                                <option value="mode">Mode</option>
+                                <option value="action">Action</option>
+                                <option value="tool_access">Tool Access</option>
+                                <option value="human_escalation">Human Escalation</option>
+                                <option value="routing">Routing</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="contextJson" class="form-label">Context JSON</label>
+                            <textarea id="contextJson" class="form-control json-view" rows="10">{
+    "event": {
+        "type": "security_alert",
+        "severity": "critical"
+    },
+    "salience": {
+        "aggregated": 0.95,
+        "risk": 0.9
+    },
+    "current_mode": "normal",
+    "active_task_count": 3
+}</textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="evaluatePolicy()">Evaluate</button>
+                        <button class="btn btn-secondary" onclick="loadSample('interrupt')">Load Sample</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Evaluation Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="results">
+                            <p>No evaluation yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Policy List</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="policyList">
+                            <p>Select a policy type to load.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/policies';
+
+        async function fetchPolicyTypes() {
+            try {
+                const res = await axios.get(`${API_BASE}/types`);
+                const list = document.getElementById('policyTypes');
+                list.innerHTML = '';
+                res.data.types.forEach(type => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    li.innerHTML = `${type} <span class="badge bg-primary rounded-pill" onclick="loadPolicies('${type}')">view</span>`;
+                    list.appendChild(li);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function fetchPolicyFiles() {
+            try {
+                const res = await axios.get(`${API_BASE}/files`);
+                const list = document.getElementById('policyFiles');
+                list.innerHTML = '';
+                res.data.files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    li.innerHTML = `${file} <span class="badge bg-secondary rounded-pill" onclick="viewFile('${file}')">view</span>`;
+                    list.appendChild(li);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function evaluatePolicy() {
+            const policyType = document.getElementById('policyType').value;
+            const contextJson = document.getElementById('contextJson').value;
+            let context;
+            try {
+                context = JSON.parse(contextJson);
+            } catch (e) {
+                alert('Invalid JSON');
+                return;
+            }
+            try {
+                const res = await axios.post(`${API_BASE}/evaluate`, {
+                    policy_type: policyType,
+                    context: context
+                });
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = `
+                    <div class="alert ${res.data.matched ? 'alert-success' : 'alert-warning'}">
+                        <strong>${res.data.matched ? 'Matched!' : 'No match'}</strong>
+                        ${res.data.matched ? `${res.data.policies.length} policy(ies) matched.` : ''}
+                    </div>
+                    <h6>Matched Policies:</h6>
+                    <div class="json-view">${JSON.stringify(res.data.policies, null, 2)}</div>
+                    ${res.data.actions ? `<h6 class="mt-3">Actions:</h6><div class="json-view">${JSON.stringify(res.data.actions, null, 2)}</div>` : ''}
+                `;
+            } catch (err) {
+                alert('Evaluation failed: ' + err.message);
+            }
+        }
+
+        async function loadPolicies(policyType) {
+            try {
+                const res = await axios.get(`${API_BASE}/${policyType}/list`);
+                const listDiv = document.getElementById('policyList');
+                listDiv.innerHTML = `<h6>Policies for ${policyType}</h6>`;
+                if (res.data.policies.length === 0) {
+                    listDiv.innerHTML += '<p>No policies found.</p>';
+                    return;
+                }
+                res.data.policies.forEach(policy => {
+                    const div = document.createElement('div');
+                    div.className = `policy-item ${policy.enabled ? 'matched' : 'unmatched'}`;
+                    div.innerHTML = `
+                        <strong>${policy.name}</strong> (v${policy.version}) <span class="badge ${policy.enabled ? 'bg-success' : 'bg-secondary'}">${policy.enabled ? 'enabled' : 'disabled'}</span>
+                        <br><small>Priority: ${policy.priority}, Tags: ${policy.tags.join(', ')}</small>
+                        <p>${policy.description || ''}</p>
+                    `;
+                    listDiv.appendChild(div);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function viewFile(filename) {
+            try {
+                const res = await axios.get(`${API_BASE}/file/${filename}`);
+                alert(JSON.stringify(res.data, null, 2));
+            } catch (err) {
+                alert('Failed to load file');
+            }
+        }
+
+        function loadSample(type) {
+            const samples = {
+                interrupt: `{
+    "event": {
+        "type": "security_alert",
+        "severity": "critical"
+    },
+    "salience": {
+        "aggregated": 0.95,
+        "risk": 0.9
+    },
+    "current_mode": "normal",
+    "active_task_count": 3
+}`,
+                mode: `{
+    "salience": {
+        "aggregated": 0.8,
+        "risk": 0.3
+    },
+    "current_mode": "normal",
+    "system_metrics": {
+        "cpu_load": 0.7,
+        "error_rate": 0.1
+    }
+}`
+            };
+            document.getElementById('contextJson').value = samples[type] || samples.interrupt;
+            document.getElementById('policyType').value = type;
+        }
+
+        // Initial load
+        fetchPolicyTypes();
+        fetchPolicyFiles();
+        loadPolicies('interrupt');
+    </script>
+</body>
+</html>

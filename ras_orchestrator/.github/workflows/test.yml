@@ -1,0 +1,149 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-asyncio pytest-xdist
+        pip install prometheus-client opentelemetry-api opentelemetry-sdk
+    - name: Run unit tests with coverage
+      run: |
+        pytest tests/ -v --cov=ras_orchestrator --cov-report=xml --cov-report=term-missing --ignore=tests/test_load_performance.py --ignore=tests/test_e2e_workflow.py
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      kafka:
+        image: confluentinc/cp-kafka:latest
+        env:
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+        ports:
+          - 9092:9092
+        options: >-
+          --health-cmd "kafka-topics --list --bootstrap-server localhost:9092"
+          --health-interval 20s
+          --health-timeout 10s
+          --health-retries 5
+      zookeeper:
+        image: confluentinc/cp-zookeeper:latest
+        env:
+          ZOOKEEPER_CLIENT_PORT: 2181
+        ports:
+          - 2181:2181
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pytest testcontainers
+    - name: Run integration tests
+      run: |
+        pytest tests/test_integration.py tests/test_e2e_workflow.py -v
+      env:
+        REDIS_HOST: localhost
+        KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pytest
+    - name: Run performance tests
+      run: |
+        pytest tests/test_performance.py tests/test_load_performance.py -v --tb=short
+
+  security-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install bandit safety
+    - name: Run bandit security scan
+      run: |
+        bandit -r ras_orchestrator -f json -o bandit-report.json || true
+    - name: Run safety check
+      run: |
+        safety check --json > safety-report.json || true
+
+  observability-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pytest prometheus-client opentelemetry-api opentelemetry-sdk
+    - name: Run observability tests
+      run: |
+        pytest tests/test_observability.py -v
+
+  report:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, performance-tests, security-tests, observability-tests]
+    if: always()
+    steps:
+    - name: Generate test report
+      run: |
+        echo "All test suites completed."
+        echo "See individual job results for details."

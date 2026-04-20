@@ -1,40 +1,79 @@
-version: "1.0"
-description: "Политики прерывания задач"
+version: "2.0"
+description: "Политики прерывания задач с расширенным DSL"
 policies:
   - name: "high_risk_security"
-    conditions:
-      event.type: "security_alert"
-      salience.risk:
-        gt: 0.8
-    reason: "Высокий риск безопасности"
+    version: "1.0"
+    description: "Прерывание при высоком риске безопасности"
+    enabled: true
     priority: 10
-    action: "interrupt"
+    tags: ["security", "high_priority"]
+    conditions:
+      all:
+        - event.type: "security_alert"
+        - salience.risk:
+            gt: 0.8
+    actions:
+      action: "interrupt"
+      reason: "Высокий риск безопасности"
+      checkpoint: true
+    metadata:
+      created: "2024-01-01"
+      author: "security_team"
 
   - name: "critical_payment_outage"
-    conditions:
-      event.type: "payment_outage"
-      event.severity: "critical"
-      salience.aggregated:
-        gt: 0.9
-    reason: "Критический сбой платежей"
+    version: "1.0"
+    enabled: true
     priority: 9
-    action: "interrupt"
+    conditions:
+      all:
+        - event.type: "payment_outage"
+        - event.severity: "critical"
+        - salience.aggregated:
+            gt: 0.9
+    actions:
+      action: "interrupt"
+      reason: "Критический сбой платежей"
+      checkpoint: false
+    metadata:
+      category: "business"
 
   - name: "elevated_mode_high_salience"
-    conditions:
-      current_mode: "elevated"
-      salience.aggregated:
-        gt: 0.7
-    reason: "Повышенный режим и высокая значимость"
+    version: "1.0"
+    enabled: true
     priority: 5
-    action: "interrupt"
+    conditions:
+      all:
+        - current_mode: "elevated"
+        - salience.aggregated:
+            gt: 0.7
+    actions:
+      action: "interrupt"
+      reason: "Повышенный режим и высокая значимость"
 
   - name: "too_many_active_tasks"
-    conditions:
-      active_task_count:
-        gt: 5
-      salience.urgency:
-        gt: 0.6
-    reason: "Перегрузка активными задачами"
+    version: "1.0"
+    enabled: true
     priority: 3
-    action: "interrupt"
+    conditions:
+      all:
+        - active_task_count:
+            gt: 5
+        - salience.urgency:
+            gt: 0.6
+    actions:
+      action: "interrupt"
+      reason: "Перегрузка активными задачами"
+
+  - name: "low_priority_delay"
+    version: "1.0"
+    enabled: true
+    priority: 1
+    conditions:
+      any:
+        - salience.urgency:
+            lt: 0.3
+        - current_mode: "low"
+    actions:
+      action: "delay"
+      reason: "Низкий приоритет, отложить"
+      delay_seconds: 300

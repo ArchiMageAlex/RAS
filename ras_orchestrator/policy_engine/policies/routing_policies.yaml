@@ -1,0 +1,58 @@
+version: "1.0"
+description: "Политики маршрутизации задач"
+policies:
+  - name: "route_high_priority_to_fast_queue"
+    version: "1.0"
+    enabled: true
+    priority: 10
+    tags: ["routing", "performance"]
+    conditions:
+      all:
+        - task.priority:
+            gt: 7
+        - task.complexity:
+            lt: 0.5
+    actions:
+      target_component: "fast_worker"
+      load_balancing: "priority"
+      fallback: "normal_worker"
+    metadata:
+      expected_latency: "low"
+
+  - name: "route_complex_to_advanced_engine"
+    version: "1.0"
+    enabled: true
+    priority: 8
+    conditions:
+      task.complexity:
+        gt: 0.8
+    actions:
+      target_component: "advanced_engine"
+      load_balancing: "least_load"
+      fallback: "fast_worker"
+
+  - name: "route_based_on_mode"
+    version: "1.0"
+    enabled: true
+    priority: 5
+    conditions:
+      system.mode: "critical"
+    actions:
+      target_component: "critical_handler"
+      load_balancing: "round_robin"
+      fallback: "advanced_engine"
+
+  - name: "route_low_priority_to_batch"
+    version: "1.0"
+    enabled: true
+    priority: 3
+    conditions:
+      all:
+        - task.priority:
+            lt: 3
+        - task.deadline:
+            gt: 3600
+    actions:
+      target_component: "batch_processor"
+      load_balancing: "round_robin"
+      fallback: "fast_worker"

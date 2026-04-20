@@ -1,0 +1,59 @@
+version: "1.0"
+description: "Политики эскалации к человеку"
+policies:
+  - name: "critical_error_escalation"
+    version: "1.0"
+    enabled: true
+    priority: 10
+    tags: ["critical", "escalation"]
+    conditions:
+      all:
+        - error.severity: "critical"
+        - system.mode: "critical"
+    actions:
+      escalation_level: "critical"
+      notify_channels: ["slack_alert", "pagerduty", "email"]
+      timeout_seconds: 300
+    metadata:
+      response_required: true
+
+  - name: "high_risk_decision"
+    version: "1.0"
+    enabled: true
+    priority: 8
+    conditions:
+      any:
+        - decision.confidence:
+            lt: 0.3
+        - decision.impact:
+            gt: 0.8
+    actions:
+      escalation_level: "high"
+      notify_channels: ["slack_review", "email"]
+      timeout_seconds: 1800
+
+  - name: "medium_risk_approval"
+    version: "1.0"
+    enabled: true
+    priority: 5
+    conditions:
+      all:
+        - agent.role: "automation"
+        - action.type: "write"
+    actions:
+      escalation_level: "medium"
+      notify_channels: ["slack_notify"]
+      timeout_seconds: 3600
+
+  - name: "low_priority_notification"
+    version: "1.0"
+    enabled: true
+    priority: 2
+    conditions:
+      all:
+        - system.mode: "normal"
+        - event.type: "anomaly"
+    actions:
+      escalation_level: "low"
+      notify_channels: ["slack_log"]
+      timeout_seconds: 86400

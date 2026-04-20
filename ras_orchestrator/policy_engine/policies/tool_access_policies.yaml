@@ -1,0 +1,57 @@
+version: "1.0"
+description: "Политики доступа к инструментам"
+policies:
+  - name: "restrict_system_tools"
+    version: "1.0"
+    enabled: true
+    priority: 10
+    tags: ["security", "system"]
+    conditions:
+      all:
+        - agent.trust_level:
+            lt: 0.5
+        - tool.category: "system"
+    actions:
+      allowed_tools: []
+      denied_tools: ["shell", "docker", "kubectl", "sudo"]
+      max_usage: 0
+    metadata:
+      reason: "Низкий уровень доверия"
+
+  - name: "allow_monitoring_tools"
+    version: "1.0"
+    enabled: true
+    priority: 3
+    conditions:
+      any:
+        - agent.role: "monitor"
+        - agent.role: "auditor"
+    actions:
+      allowed_tools: ["prometheus", "grafana", "logs", "metrics"]
+      denied_tools: []
+      max_usage: 100
+
+  - name: "limit_high_cost_tools"
+    version: "1.0"
+    enabled: true
+    priority: 7
+    conditions:
+      tool.cost:
+        gt: 10
+    actions:
+      allowed_tools: []
+      denied_tools: []
+      max_usage: 5
+    metadata:
+      note: "Ограничение использования дорогих инструментов"
+
+  - name: "allow_all_for_admin"
+    version: "1.0"
+    enabled: true
+    priority: 1
+    conditions:
+      agent.role: "admin"
+    actions:
+      allowed_tools: ["*"]
+      denied_tools: []
+      max_usage: -1
