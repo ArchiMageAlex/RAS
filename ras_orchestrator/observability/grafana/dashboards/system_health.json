@@ -80,7 +80,7 @@
         "targets": [
           {
             "expr": "rate(ras_events_total[5m])",
-            "legendFormat": "Events/sec"
+            "legendFormat": "{{event_type}}"
           }
         ],
         "gridPos": {
