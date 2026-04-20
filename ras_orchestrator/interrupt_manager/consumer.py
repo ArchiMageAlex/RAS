@@ -6,7 +6,7 @@ Consumer для Interrupt Manager.
 import logging
 import time
 from common.utils import setup_logging
-from common.telemetry import init_observability, get_tracer, business_metrics
+from common.telemetry import init_observability, get_tracer, business_metrics, system_metrics
 from .manager import get_interrupt_manager
 from common.models import Event, EventType, Severity, SalienceScore, SystemMode
 from datetime import datetime
@@ -36,7 +36,7 @@ def process_event(event, salience_score, current_mode):
         except Exception as e:
             logger.error(f"Error evaluating interrupt: {e}")
             span.record_exception(e)
-            business_metrics["service_error_rate"].add(1)
+            system_metrics["service_error_rate"].add(1)
             raise
 
 def simulate_consumption():

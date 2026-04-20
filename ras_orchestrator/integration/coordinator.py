@@ -4,14 +4,13 @@
 """
 import json
 import logging
-import uuid
+import os
 import time
-from typing import Any, Dict, Optional, Callable, List
-from datetime import datetime, timedelta
-from enum import Enum
-from dataclasses import dataclass
+import uuid
+from datetime import datetime
+from typing import Callable, Dict, Any, Optional
 
-from kafka import KafkaProducer, KafkaConsumer
+from kafka import KafkaProducer
 from kafka.errors import KafkaError
 import redis
 
@@ -142,19 +141,27 @@ class IntegrationCoordinator:
 
     def __init__(
         self,
-        kafka_bootstrap_servers: str = "localhost:9092",
-        redis_host: str = "localhost",
-        redis_port: int = 6379,
+        kafka_bootstrap_servers: str = None,
+        redis_host: str = None,
+        redis_port: int = None,
     ):
         # Kafka producer для отправки событий
+        self.kafka_bootstrap_servers = kafka_bootstrap_servers or os.getenv(
+            "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"
+        )
         self.producer = KafkaProducer(
-            bootstrap_servers=kafka_bootstrap_servers,
+            bootstrap_servers=self.kafka_bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
             acks="all",
             retries=3,
         )
         # Redis для idempotency и DLQ
-        self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+        self.redis_host = redis_host or os.getenv("REDIS_HOST", "localhost")
+        self.redis_port = redis_port or int(os.getenv("REDIS_PORT", "6379"))
+        logger.info(f"Connecting to Redis at {self.redis_host}:{self.redis_port}")
+        self.redis = redis.Redis(
+            host=self.redis_host, port=self.redis_port, decode_responses=True
+        )
         self.idempotency_store = IdempotencyStore(self.redis)
         self.dlq = DeadLetterQueue(self.redis)
         self.retry_policy = RetryPolicy()

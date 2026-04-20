@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from typing import Optional, Any, Dict, List
 import redis
 
@@ -9,8 +10,19 @@ logger = logging.getLogger(__name__)
 class WorkspaceService:
     """Сервис рабочего пространства на основе Redis."""
 
-    def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0):
-        self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True)
+    def __init__(
+        self,
+        host: str = None,
+        port: int = None,
+        db: int = None,
+    ):
+        self.host = host or os.getenv("REDIS_HOST", "localhost")
+        self.port = port or int(os.getenv("REDIS_PORT", "6379"))
+        self.db = db or int(os.getenv("REDIS_DB", "0"))
+        logger.info(f"Connecting to Redis at {self.host}:{self.port}/{self.db}")
+        self.redis_client = redis.Redis(
+            host=self.host, port=self.port, db=self.db, decode_responses=True
+        )
         self.prefix = "ras:workspace:"
 
     def _key(self, category: str, identifier: str) -> str:
