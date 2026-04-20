@@ -2,12 +2,23 @@ import logging
 import os
 import time
 from typing import Dict, Any, Optional
+from contextlib import nullcontext
 from common.models import Event, SalienceScore, Severity
 from common.telemetry import get_tracer, business_metrics, system_metrics
 from .advanced_scoring import AdvancedScoring, SimilarityCache, AnomalyDetector
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer("salience_engine")
+
+
+class SafeTracer:
+    """Safe tracer wrapper that works when OpenTelemetry is not available."""
+    
+    def start_as_current_span(self, name: str, **kwargs):
+        """Return a null context if tracer is not available."""
+        if tracer is not None:
+            return tracer.start_as_current_span(name, **kwargs)
+        return nullcontext()
 
 
 class SalienceEngine:
@@ -25,10 +36,12 @@ class SalienceEngine:
 
     def compute(self, event: Event) -> SalienceScore:
         """Вычисляет salience score для события."""
-        with tracer.start_as_current_span("salience_compute") as span:
-            span.set_attribute("event.id", event.event_id)
-            span.set_attribute("event.type", event.type.value)
-            span.set_attribute("event.severity", event.severity.value)
+        safe_tracer = SafeTracer()
+        with safe_tracer.start_as_current_span("salience_compute") as span:
+            if span:
+                span.set_attribute("event.id", event.event_id)
+                span.set_attribute("event.type", event.type.value)
+                span.set_attribute("event.severity", event.severity.value)
 
             start_time = time.time()
             relevance = self._compute_relevance(event)
@@ -54,8 +67,9 @@ class SalienceEngine:
                 aggregated=aggregated,
             )
             elapsed = (time.time() - start_time) * 1000  # milliseconds
-            span.set_attribute("computation.time_ms", elapsed)
-            span.set_attribute("salience.score", aggregated)
+            if span:
+                span.set_attribute("computation.time_ms", elapsed)
+                span.set_attribute("salience.score", aggregated)
 
             # Record metrics
             business_metrics["salience_score_distribution"].record(aggregated)
@@ -126,17 +140,20 @@ class EnhancedSalienceEngine(SalienceEngine):
 
     def compute(self, event: Event) -> SalienceScore:
         """Вычисляет salience score с улучшенными возможностями."""
-        with tracer.start_as_current_span("enhanced_salience_compute") as span:
-            span.set_attribute("event.id", event.event_id)
-            span.set_attribute("cache.enabled", self.use_cache)
-            span.set_attribute("anomaly_detection.enabled", self.use_anomaly_detection)
+        safe_tracer = SafeTracer()
+        with safe_tracer.start_as_current_span("enhanced_salience_compute") as span:
+            if span:
+                span.set_attribute("event.id", event.event_id)
+                span.set_attribute("cache.enabled", self.use_cache)
+                span.set_attribute("anomaly_detection.enabled", self.use_anomaly_detection)
 
             # Проверка кэша
             if self.use_cache and self.cache:
                 cached = self.cache.get(event)
                 if cached is not None:
                     logger.debug(f"Cache hit for event {event.event_id}")
-                    span.set_attribute("cache.hit", True)
+                    if span:
+                        span.set_attribute("cache.hit", True)
                     # Возвращаем стандартный SalienceScore с кэшированным aggregated
                     # Для остальных компонентов используем значения по умолчанию (можно улучшить)
                     return SalienceScore(
@@ -147,7 +164,8 @@ class EnhancedSalienceEngine(SalienceEngine):
                         uncertainty=0.2,
                         aggregated=cached,
                     )
-                span.set_attribute("cache.hit", False)
+                if span:
+                    span.set_attribute("cache.hit", False)
 
             # Используем расширенное вычисление
             result = self.advanced_scoring.compute(event)
@@ -160,8 +178,9 @@ class EnhancedSalienceEngine(SalienceEngine):
                         f"Anomalous salience score detected for event {event.event_id}: "
                         f"score={result['aggregated']:.3f}, z={z_score:.2f}"
                     )
-                    span.set_attribute("anomaly.detected", True)
-                    span.set_attribute("anomaly.z_score", z_score)
+                    if span:
+                        span.set_attribute("anomaly.detected", True)
+                        span.set_attribute("anomaly.z_score", z_score)
                     business_metrics["interrupt_rate"].add(1, {"type": "anomaly_detected"})
 
             # Сохранение в кэш

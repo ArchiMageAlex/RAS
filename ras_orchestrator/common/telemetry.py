@@ -7,22 +7,81 @@ import os
 import logging
 from typing import Optional, Dict, Any
 
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.metrics import set_meter_provider, get_meter_provider
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+# Lazy imports for OpenTelemetry - imported on demand to allow running without OTel
+trace = None
+TracerProvider = None
+BatchSpanProcessor = None
+ConsoleSpanExporter = None
+Resource = None
+SERVICE_NAME = None
+SERVICE_VERSION = None
+OTLPSpanExporter = None
+JaegerExporter = None
+PrometheusMetricReader = None
+set_meter_provider = None
+get_meter_provider = None
+MeterProvider = None
+PeriodicExportingMetricReader = None
+OTLPMetricExporter = None
+FastAPIInstrumentor = None
+KafkaInstrumentor = None
+RedisInstrumentor = None
+LoggingInstrumentor = None
+TraceIdRatioBased = None
+ConsoleMetricExporter = None
 
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.kafka import KafkaInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.instrumentation.logging import LoggingInstrumentor
+
+def _import_otel():
+    """Lazy import of OpenTelemetry modules."""
+    global trace, TracerProvider, BatchSpanProcessor, ConsoleSpanExporter
+    global Resource, SERVICE_NAME, SERVICE_VERSION, OTLPSpanExporter, JaegerExporter
+    global PrometheusMetricReader, set_meter_provider, get_meter_provider
+    global MeterProvider, PeriodicExportingMetricReader, OTLPMetricExporter
+    global FastAPIInstrumentor, KafkaInstrumentor, RedisInstrumentor, LoggingInstrumentor
+    global TraceIdRatioBased, ConsoleMetricExporter
+    
+    if trace is not None:
+        return  # Already imported
+    
+    from opentelemetry import trace as _trace
+    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor, ConsoleSpanExporter as _ConsoleSpanExporter
+    from opentelemetry.sdk.resources import Resource as _Resource, SERVICE_NAME as _SERVICE_NAME, SERVICE_VERSION as _SERVICE_VERSION
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as _OTLPSpanExporter
+    from opentelemetry.exporter.jaeger.thrift import JaegerExporter as _JaegerExporter
+    from opentelemetry.exporter.prometheus import PrometheusMetricReader as _PrometheusMetricReader
+    from opentelemetry.metrics import set_meter_provider as _set_meter_provider, get_meter_provider as _get_meter_provider
+    from opentelemetry.sdk.metrics import MeterProvider as _MeterProvider
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader as _PeriodicExportingMetricReader
+    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter as _OTLPMetricExporter
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor as _FastAPIInstrumentor
+    from opentelemetry.instrumentation.kafka import KafkaInstrumentor as _KafkaInstrumentor
+    from opentelemetry.instrumentation.redis import RedisInstrumentor as _RedisInstrumentor
+    from opentelemetry.instrumentation.logging import LoggingInstrumentor as _LoggingInstrumentor
+    from opentelemetry.sdk.trace.sampling import TraceIdRatioBased as _TraceIdRatioBased
+    from opentelemetry.sdk.metrics.export import ConsoleMetricExporter as _ConsoleMetricExporter
+    
+    trace = _trace
+    TracerProvider = _TracerProvider
+    BatchSpanProcessor = _BatchSpanProcessor
+    ConsoleSpanExporter = _ConsoleSpanExporter
+    Resource = _Resource
+    SERVICE_NAME = _SERVICE_NAME
+    SERVICE_VERSION = _SERVICE_VERSION
+    OTLPSpanExporter = _OTLPSpanExporter
+    JaegerExporter = _JaegerExporter
+    PrometheusMetricReader = _PrometheusMetricReader
+    set_meter_provider = _set_meter_provider
+    get_meter_provider = _get_meter_provider
+    MeterProvider = _MeterProvider
+    PeriodicExportingMetricReader = _PeriodicExportingMetricReader
+    OTLPMetricExporter = _OTLPMetricExporter
+    FastAPIInstrumentor = _FastAPIInstrumentor
+    KafkaInstrumentor = _KafkaInstrumentor
+    RedisInstrumentor = _RedisInstrumentor
+    LoggingInstrumentor = _LoggingInstrumentor
+    TraceIdRatioBased = _TraceIdRatioBased
+    ConsoleMetricExporter = _ConsoleMetricExporter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,19 +92,27 @@ SERVICE_NAME_VALUE = os.getenv("OTEL_SERVICE_NAME", "ras-orchestrator")
 SERVICE_VERSION_VALUE = os.getenv("OTEL_SERVICE_VERSION", "0.1.0")
 DEPLOYMENT_ENV = os.getenv("DEPLOYMENT_ENV", "development")
 
-# Resource attributes
-resource = Resource.create({
-    SERVICE_NAME: SERVICE_NAME_VALUE,
-    SERVICE_VERSION: SERVICE_VERSION_VALUE,
-    "deployment.environment": DEPLOYMENT_ENV,
-    "telemetry.sdk.name": "opentelemetry",
-    "telemetry.sdk.language": "python",
-    "telemetry.sdk.version": "1.24.0",
-})
+# Resource attributes - initialized lazily
+_resource = None
+
+def _get_resource():
+    """Get or create OpenTelemetry resource."""
+    global _resource
+    if _resource is None:
+        _import_otel()
+        _resource = Resource.create({
+            SERVICE_NAME: SERVICE_NAME_VALUE,
+            SERVICE_VERSION: SERVICE_VERSION_VALUE,
+            "deployment.environment": DEPLOYMENT_ENV,
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.version": "1.24.0",
+        })
+    return _resource
 
 # Global tracer and meter providers
-_tracer_provider: Optional[TracerProvider] = None
-_meter_provider: Optional[MeterProvider] = None
+_tracer_provider = None
+_meter_provider = None
 
 
 def init_tracing(
@@ -63,16 +130,21 @@ def init_tracing(
     """
     global _tracer_provider
 
+    try:
+        _import_otel()
+    except ImportError:
+        logger.warning("OpenTelemetry not installed, tracing disabled")
+        return
+
     if _tracer_provider is not None:
         logger.warning("TracerProvider already initialized, skipping.")
         return
 
     # Create TracerProvider
-    tracer_provider = TracerProvider(resource=resource)
+    tracer_provider = TracerProvider(resource=_get_resource())
     trace.set_tracer_provider(tracer_provider)
 
     # Configure sampler
-    from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
     sampler = TraceIdRatioBased(sampling_rate)
     tracer_provider.sampler = sampler
 
@@ -115,6 +187,12 @@ def init_metrics(
     """
     global _meter_provider
 
+    try:
+        _import_otel()
+    except ImportError:
+        logger.warning("OpenTelemetry not installed, metrics disabled")
+        return
+
     if _meter_provider is not None:
         logger.warning("MeterProvider already initialized, skipping.")
         return
@@ -132,11 +210,10 @@ def init_metrics(
         reader = PeriodicExportingMetricReader(exporter, export_interval_millis=5000)
     else:
         # Default to console (for debugging)
-        from opentelemetry.sdk.metrics.export import ConsoleMetricExporter
         exporter = ConsoleMetricExporter()
         reader = PeriodicExportingMetricReader(exporter, export_interval_millis=5000)
 
-    meter_provider = MeterProvider(resource=resource, metric_readers=[reader])
+    meter_provider = MeterProvider(resource=_get_resource(), metric_readers=[reader])
     set_meter_provider(meter_provider)
     _meter_provider = meter_provider
     logger.info(f"Metrics initialized with {exporter_type} exporter")
@@ -144,40 +221,64 @@ def init_metrics(
 
 def init_logging_correlation() -> None:
     """Inject trace IDs into logs."""
-    LoggingInstrumentor().instrument(set_logging_format=True)
-    logger.info("Logging correlation with OpenTelemetry enabled")
+    try:
+        _import_otel()
+        LoggingInstrumentor().instrument(set_logging_format=True)
+        logger.info("Logging correlation with OpenTelemetry enabled")
+    except ImportError:
+        logger.warning("OpenTelemetry not installed, logging correlation disabled")
 
 
 def instrument_fastapi(app):
     """Instrument FastAPI application."""
-    FastAPIInstrumentor.instrument_app(app)
-    logger.info("FastAPI instrumented for OpenTelemetry")
+    try:
+        _import_otel()
+        FastAPIInstrumentor.instrument_app(app)
+        logger.info("FastAPI instrumented for OpenTelemetry")
+    except ImportError:
+        logger.warning("OpenTelemetry not installed, FastAPI instrumentation skipped")
 
 
 def instrument_kafka():
     """Instrument Kafka clients."""
-    KafkaInstrumentor().instrument()
-    logger.info("Kafka instrumented for OpenTelemetry")
+    try:
+        _import_otel()
+        KafkaInstrumentor().instrument()
+        logger.info("Kafka instrumented for OpenTelemetry")
+    except ImportError:
+        logger.warning("OpenTelemetry not installed, Kafka instrumentation skipped")
 
 
 def instrument_redis():
     """Instrument Redis clients."""
-    RedisInstrumentor().instrument()
-    logger.info("Redis instrumented for OpenTelemetry")
+    try:
+        _import_otel()
+        RedisInstrumentor().instrument()
+        logger.info("Redis instrumented for OpenTelemetry")
+    except ImportError:
+        logger.warning("OpenTelemetry not installed, Redis instrumentation skipped")
 
 
-def get_tracer(name: str = None) -> trace.Tracer:
+def get_tracer(name: str = None) -> Optional[Any]:
     """Get a tracer instance."""
+    try:
+        _import_otel()
+    except ImportError:
+        return None
     if _tracer_provider is None:
         init_tracing()
-    return trace.get_tracer(name or SERVICE_NAME_VALUE)
+    return trace.get_tracer(name or SERVICE_NAME_VALUE) if trace else None
 
 
 def get_meter(name: str = None):
     """Get a meter instance."""
+    try:
+        _import_otel()
+    except ImportError:
+        return None
     if _meter_provider is None:
         init_metrics()
-    return get_meter_provider().get_meter(name or SERVICE_NAME_VALUE)
+    return get_meter_provider().get_meter(name or SERVICE_NAME_VALUE) if get_meter_provider else None
 
 
 def init_observability(
@@ -193,6 +294,12 @@ def init_observability(
 
     This function should be called at application startup.
     """
+    try:
+        _import_otel()
+    except ImportError:
+        logger.warning("OpenTelemetry not installed, observability disabled")
+        return
+
     # Determine exporters from environment
     tracing_exporter = tracing_exporter or os.getenv("OTEL_TRACES_EXPORTER", "console")
     metrics_exporter = metrics_exporter or os.getenv("OTEL_METRICS_EXPORTER", "prometheus")
@@ -213,6 +320,20 @@ def init_observability(
 def create_business_metrics():
     """Create business metrics instruments."""
     meter = get_meter("business")
+    if meter is None:
+        # Return dummy metrics if OpenTelemetry is not available
+        class DummyMetric:
+            def record(self, *args, **kwargs): pass
+            def add(self, *args, **kwargs): pass
+            def set(self, *args, **kwargs): pass
+        return {
+            "salience_score_distribution": DummyMetric(),
+            "interrupt_rate": DummyMetric(),
+            "mode_transitions": DummyMetric(),
+            "policy_evaluation_latency": DummyMetric(),
+            "agent_task_completion_time": DummyMetric(),
+            "human_escalation_rate": DummyMetric(),
+        }
     return {
         "salience_score_distribution": meter.create_histogram(
             name="salience_score_distribution",
@@ -250,6 +371,18 @@ def create_business_metrics():
 def create_system_metrics():
     """Create system metrics instruments."""
     meter = get_meter("system")
+    if meter is None:
+        # Return dummy metrics if OpenTelemetry is not available
+        class DummyMetric:
+            def record(self, *args, **kwargs): pass
+            def add(self, *args, **kwargs): pass
+            def set(self, *args, **kwargs): pass
+        return {
+            "kafka_consumer_lag": DummyMetric(),
+            "redis_latency": DummyMetric(),
+            "postgres_query_duration": DummyMetric(),
+            "service_error_rate": DummyMetric(),
+        }
     return {
         "kafka_consumer_lag": meter.create_gauge(
             name="kafka_consumer_lag",

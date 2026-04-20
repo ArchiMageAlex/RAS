@@ -51,19 +51,25 @@ def get_correlation_id():
     """
     Получает correlation ID из текущего контекста OpenTelemetry baggage.
     """
-    from opentelemetry import baggage
-    return baggage.get_baggage("correlation_id")
+    try:
+        from opentelemetry import baggage
+        return baggage.get_baggage("correlation_id")
+    except ImportError:
+        return None
 
 
 def set_correlation_id(cid: str):
     """
     Устанавливает correlation ID в baggage OpenTelemetry.
     """
-    from opentelemetry import baggage
-    import opentelemetry.context as context
-    ctx = baggage.set_baggage("correlation_id", cid)
-    context.attach(ctx)
-    return cid
+    try:
+        from opentelemetry import baggage
+        import opentelemetry.context as context
+        ctx = baggage.set_baggage("correlation_id", cid)
+        context.attach(ctx)
+        return cid
+    except ImportError:
+        return None
 
 
 def log_with_context(logger, level, message, **kwargs):
@@ -71,12 +77,15 @@ def log_with_context(logger, level, message, **kwargs):
     Логирует сообщение с добавлением контекста (trace_id, span_id, correlation_id).
     """
     extra = {}
-    from opentelemetry import trace
-    span = trace.get_current_span()
-    if span and span.is_recording():
-        ctx = span.get_span_context()
-        extra["trace_id"] = format(ctx.trace_id, "032x")
-        extra["span_id"] = format(ctx.span_id, "016x")
+    try:
+        from opentelemetry import trace
+        span = trace.get_current_span()
+        if span and span.is_recording():
+            ctx = span.get_span_context()
+            extra["trace_id"] = format(ctx.trace_id, "032x")
+            extra["span_id"] = format(ctx.span_id, "016x")
+    except ImportError:
+        pass
     cid = get_correlation_id()
     if cid:
         extra["correlation_id"] = cid

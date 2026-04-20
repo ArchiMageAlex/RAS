@@ -43,25 +43,34 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         # Добавляем trace_id и span_id из OpenTelemetry, если доступны
         span = getattr(record, "otelSpan", None)
         if span:
-            context = span.get_span_context()
-            log_record["trace_id"] = format(context.trace_id, "032x")
-            log_record["span_id"] = format(context.span_id, "016x")
+            try:
+                context = span.get_span_context()
+                log_record["trace_id"] = format(context.trace_id, "032x")
+                log_record["span_id"] = format(context.span_id, "016x")
+            except Exception:
+                pass
         else:
             # Пытаемся получить из текущего контекста
-            from opentelemetry import trace
-            current_span = trace.get_current_span()
-            if current_span and current_span.is_recording():
-                context = current_span.get_span_context()
-                if context.trace_id:
-                    log_record["trace_id"] = format(context.trace_id, "032x")
-                if context.span_id:
-                    log_record["span_id"] = format(context.span_id, "016x")
+            try:
+                from opentelemetry import trace
+                current_span = trace.get_current_span()
+                if current_span and current_span.is_recording():
+                    context = current_span.get_span_context()
+                    if context.trace_id:
+                        log_record["trace_id"] = format(context.trace_id, "032x")
+                    if context.span_id:
+                        log_record["span_id"] = format(context.span_id, "016x")
+            except ImportError:
+                pass
 
         # Добавляем baggage (business context)
-        from opentelemetry import baggage
-        baggage_entries = baggage.get_all()
-        if baggage_entries:
-            log_record["baggage"] = dict(baggage_entries)
+        try:
+            from opentelemetry import baggage
+            baggage_entries = baggage.get_all()
+            if baggage_entries:
+                log_record["baggage"] = dict(baggage_entries)
+        except ImportError:
+            pass
 
 
 def setup_logging():
@@ -115,7 +124,10 @@ def setup_logging():
     # Настраиваем логирование для библиотек
     logging.getLogger("kafka").setLevel(logging.WARNING)
     logging.getLogger("redis").setLevel(logging.WARNING)
-    logging.getLogger("opentelemetry").setLevel(logging.WARNING)
+    try:
+        logging.getLogger("opentelemetry").setLevel(logging.WARNING)
+    except Exception:
+        pass
 
     logging.info("Logging configured", extra={
         "log_level": DEFAULT_LOG_LEVEL,

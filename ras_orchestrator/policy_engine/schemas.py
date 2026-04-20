@@ -3,9 +3,19 @@
 """
 import logging
 import yaml
-import jsonschema
 from typing import Dict, Any, List
 from pathlib import Path
+
+# jsonschema - optional dependency
+jsonschema = None
+
+def _import_jsonschema():
+    """Lazy import of jsonschema."""
+    global jsonschema
+    if jsonschema is not None:
+        return
+    import jsonschema as _jsonschema
+    jsonschema = _jsonschema
 
 logger = logging.getLogger(__name__)
 
@@ -158,18 +168,22 @@ class PolicyValidator:
         errors = []
         # Базовая валидация по общей схеме
         try:
-            jsonschema.validate(instance=data, schema=POLICY_SCHEMA)
-        except jsonschema.ValidationError as e:
-            errors.append(f"Schema validation error: {e.message}")
+            _import_jsonschema()
+            if jsonschema:
+                jsonschema.validate(instance=data, schema=POLICY_SCHEMA)
+        except Exception as e:
+            errors.append(f"Schema validation error: {e}")
 
         # Валидация действий по типу политики
         if policy_type and policy_type in self.schemas:
             for i, policy in enumerate(data.get("policies", [])):
                 actions = policy.get("actions", {})
                 try:
-                    jsonschema.validate(instance=actions, schema=self.schemas[policy_type])
-                except jsonschema.ValidationError as e:
-                    errors.append(f"Policy '{policy.get('name')}' actions validation error: {e.message}")
+                    _import_jsonschema()
+                    if jsonschema:
+                        jsonschema.validate(instance=actions, schema=self.schemas[policy_type])
+                except Exception as e:
+                    errors.append(f"Policy '{policy.get('name')}' actions validation error: {e}")
 
         # Семантическая валидация
         errors.extend(self._semantic_validation(data))

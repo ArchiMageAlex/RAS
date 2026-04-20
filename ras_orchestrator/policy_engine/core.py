@@ -11,8 +11,20 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum
 from threading import Lock
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+
+# Lazy import for watchdog - optional dependency
+Observer = None
+FileSystemEventHandler = None
+
+def _import_watchdog():
+    """Lazy import of watchdog."""
+    global Observer, FileSystemEventHandler
+    if Observer is not None:
+        return
+    from watchdog.observers import Observer as _Observer
+    from watchdog.events import FileSystemEventHandler as _FileSystemEventHandler
+    Observer = _Observer
+    FileSystemEventHandler = _FileSystemEventHandler
 
 from common.models import Event, SalienceScore, SystemMode
 
@@ -251,11 +263,15 @@ class PolicyCache:
             return hashlib.md5(f.read()).hexdigest()
 
 
-class PolicyWatcher(FileSystemEventHandler):
+class PolicyWatcher:
     """Отслеживает изменения файлов политик для hot-reload."""
 
     def __init__(self, engine: 'PolicyEngineCore'):
+        _import_watchdog()
         self.engine = engine
+        # Инициализируем родительский класс watchdog, если доступен
+        if FileSystemEventHandler is not None:
+            FileSystemEventHandler.__init__(self)
 
     def on_modified(self, event):
         if not event.is_directory and event.src_path.endswith(('.yaml', '.yml')):
@@ -311,11 +327,15 @@ class PolicyEngineCore:
 
     def _start_watcher(self):
         """Запускает watchdog для отслеживания изменений."""
-        self.observer = Observer()
-        handler = PolicyWatcher(self)
-        self.observer.schedule(handler, str(self.policy_dir), recursive=True)
-        self.observer.start()
-        logger.info(f"Started policy watcher on {self.policy_dir}")
+        try:
+            _import_watchdog()
+            self.observer = Observer()
+            handler = PolicyWatcher(self)
+            self.observer.schedule(handler, str(self.policy_dir), recursive=True)
+            self.observer.start()
+            logger.info(f"Started policy watcher on {self.policy_dir}")
+        except ImportError:
+            logger.warning("watchdog not installed, policy hot-reload disabled")
 
     def stop(self):
         """Останавливает watcher."""
