@@ -3,6 +3,7 @@ apiVersion: 1
 providers:
   - name: 'RAS Dashboards'
     orgId: 1
+    title: 'RAS Dashboards'
     folder: 'RAS'
     folderUid: 'ras'
     type: file

@@ -1,7 +1,5 @@
 {
-  "dashboard": {
-    "id": null,
-    "title": "System Health Dashboard",
+    "title": "System Health Dashboard v2",
     "tags": ["ras", "system", "health"],
     "timezone": "browser",
     "panels": [
@@ -94,8 +92,7 @@
       }
     ],
     "schemaVersion": 36,
-    "version": 0
-  },
+    "version": 0,
   "folderTitle": "RAS",
   "overwrite": true
 }
