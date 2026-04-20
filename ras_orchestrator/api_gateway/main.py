@@ -7,6 +7,7 @@ from datetime import datetime
 
 from common.models import Event, EventType, Severity
 from common.telemetry import init_observability, get_tracer, business_metrics, system_metrics, instrument_fastapi
+from common.utils import EVENT_COUNTER
 from event_bus.kafka_client import produce_event
 from policy_engine.api import router as policy_router
 
@@ -91,6 +92,8 @@ async def ingest_event(event_req: EventRequest, request: Request):
             # Отправка в Kafka
             await produce_event(event)
             logger.info(f"Event {event_id} ingested and sent to event bus.")
+            # Increment event counter
+            EVENT_COUNTER.labels(event_type=event.type.value, severity=event.severity.value).inc()
             # Record metric
             if business_metrics and "interrupt_rate" in business_metrics:
                 business_metrics["interrupt_rate"].add(1, {"type": "event_ingested"})

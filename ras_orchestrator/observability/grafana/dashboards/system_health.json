@@ -46,7 +46,7 @@
         "targets": [
           {
             "expr": "rate(process_cpu_seconds_total[5m]) * 100",
-            "legendFormat": "CPU %"
+            "legendFormat": "{{job}}"
           }
         ],
         "gridPos": {
@@ -63,7 +63,7 @@
         "targets": [
           {
             "expr": "process_resident_memory_bytes",
-            "legendFormat": "Memory"
+            "legendFormat": "{{job}}"
           }
         ],
         "gridPos": {
