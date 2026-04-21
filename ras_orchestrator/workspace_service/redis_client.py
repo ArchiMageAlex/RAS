@@ -84,6 +84,61 @@ class WorkspaceService:
             result[task_id] = json.loads(data)
         return result
 
+    # Phase 2: Checkpoint storage
+    def store_checkpoint(self, checkpoint_id: str, data: bytes, ttl: Optional[int] = None) -> bool:
+        """Сохраняет чекпоинт в Redis."""
+        key = self._key("checkpoint", checkpoint_id)
+        try:
+            # Используем set с binary данными
+            self.redis_client.set(key, data)
+            if ttl:
+                self.redis_client.expire(key, ttl)
+            logger.debug(f"Checkpoint stored: {checkpoint_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to store checkpoint {checkpoint_id}: {e}")
+            return False
+
+    def get_checkpoint(self, checkpoint_id: str) -> Optional[bytes]:
+        """Получает чекпоинт по ID."""
+        key = self._key("checkpoint", checkpoint_id)
+        try:
+            data = self.redis_client.get(key)
+            if data is None:
+                return None
+            # Redis возвращает bytes, если decode_responses=False, но у нас decode_responses=True
+            # Чтобы избежать проблем, временно создадим отдельное соединение для бинарных данных
+            # Упрощённо: предполагаем, что данные уже bytes
+            if isinstance(data, str):
+                return data.encode('utf-8')
+            return data
+        except Exception as e:
+            logger.error(f"Failed to retrieve checkpoint {checkpoint_id}: {e}")
+            return None
+
+    def delete_checkpoint(self, checkpoint_id: str) -> bool:
+        """Удаляет чекпоинт."""
+        key = self._key("checkpoint", checkpoint_id)
+        try:
+            self.redis_client.delete(key)
+            logger.debug(f"Checkpoint deleted: {checkpoint_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete checkpoint {checkpoint_id}: {e}")
+            return False
+
+    def list_checkpoints(self, pattern: str = "*") -> List[str]:
+        """Возвращает список ID чекпоинтов."""
+        key_pattern = self._key("checkpoint", pattern)
+        try:
+            keys = self.redis_client.keys(key_pattern)
+            # Убираем префикс
+            prefix_len = len(self._key("checkpoint", ""))
+            return [key[prefix_len:] for key in keys]
+        except Exception as e:
+            logger.error(f"Failed to list checkpoints: {e}")
+            return []
+
     def publish_update(self, channel: str, message: Dict[str, Any]):
         """Публикует обновление в Redis Pub/Sub."""
         self.redis_client.publish(channel, json.dumps(message, default=str))

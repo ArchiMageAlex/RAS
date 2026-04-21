@@ -6,6 +6,10 @@ from contextlib import nullcontext
 from common.models import Event, SalienceScore, Severity
 from common.telemetry import get_tracer, business_metrics, system_metrics
 from .advanced_scoring import AdvancedScoring, SimilarityCache, AnomalyDetector
+from .novelty_detector import NoveltyDetector
+from .historical_repository import HistoricalRepository
+from .trust_scorer import TrustScorer
+from .source_registry import SourceRegistry
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer("salience_engine")
@@ -24,7 +28,14 @@ class SafeTracer:
 class SalienceEngine:
     """Базовый двигатель оценки значимости событий (обратная совместимость)."""
 
-    def __init__(self, weights: Optional[Dict[str, float]] = None):
+    def __init__(
+        self,
+        weights: Optional[Dict[str, float]] = None,
+        historical_repository: Optional[HistoricalRepository] = None,
+        novelty_detector: Optional[NoveltyDetector] = None,
+        source_registry: Optional[SourceRegistry] = None,
+        trust_scorer: Optional[TrustScorer] = None,
+    ):
         # Веса для агрегации (можно настраивать)
         self.weights = weights or {
             "relevance": 0.3,
@@ -33,6 +44,10 @@ class SalienceEngine:
             "urgency": 0.15,
             "uncertainty": 0.1,
         }
+        self.historical_repository = historical_repository
+        self.novelty_detector = novelty_detector
+        self.source_registry = source_registry
+        self.trust_scorer = trust_scorer
 
     def compute(self, event: Event) -> SalienceScore:
         """Вычисляет salience score для события."""
@@ -78,27 +93,55 @@ class SalienceEngine:
             logger.info(f"Computed salience score for event {event.event_id}: {aggregated:.3f}")
             return score
 
+    def _get_trust_score(self, source: str) -> float:
+        """Возвращает trust score источника (0.0-1.0)."""
+        if self.trust_scorer and self.source_registry:
+            try:
+                return self.trust_scorer.compute_trust(source)
+            except Exception as e:
+                logger.warning(f"Trust scoring failed for source {source}: {e}")
+        return 0.5  # нейтральное значение по умолчанию
+
     def _compute_relevance(self, event: Event) -> float:
-        """Релевантность события целям системы."""
+        """Релевантность события целям системы с учётом trust score."""
         severity_map = {
             Severity.LOW: 0.2,
             Severity.MEDIUM: 0.5,
             Severity.HIGH: 0.8,
             Severity.CRITICAL: 1.0,
         }
-        return severity_map.get(event.severity, 0.5)
+        base = severity_map.get(event.severity, 0.5)
+        trust = self._get_trust_score(event.source)
+        # Корректировка: доверенные источники увеличивают релевантность, ненадёжные уменьшают
+        # trust = 0.5 → множитель 1.0, trust = 1.0 → множитель 1.2, trust = 0.0 → множитель 0.8
+        multiplier = 0.8 + (trust * 0.4)
+        return max(0.0, min(1.0, base * multiplier))
 
     def _compute_novelty(self, event: Event) -> float:
-        """Новизна события (пока заглушка)."""
+        """Новизна события на основе исторических паттернов."""
+        if self.novelty_detector and self.historical_repository:
+            try:
+                return self.novelty_detector.compute_novelty(event)
+            except Exception as e:
+                logger.warning(f"Novelty detection failed: {e}, falling back to default")
+                return 0.3
+        # Если детектор не настроен, возвращаем значение по умолчанию
         return 0.3
 
     def _compute_risk(self, event: Event) -> float:
-        """Риск события."""
+        """Риск события с учётом trust score."""
         if event.type == "security_alert":
-            return 0.9
-        if event.type == "payment_outage":
-            return 0.8
-        return 0.4
+            base = 0.9
+        elif event.type == "payment_outage":
+            base = 0.8
+        else:
+            base = 0.4
+
+        trust = self._get_trust_score(event.source)
+        # Корректировка: ненадёжные источники увеличивают риск, доверенные уменьшают
+        # trust = 0.0 → множитель 1.3, trust = 1.0 → множитель 0.7
+        multiplier = 1.3 - (trust * 0.6)
+        return max(0.0, min(1.0, base * multiplier))
 
     def _compute_urgency(self, event: Event) -> float:
         """Срочность."""
