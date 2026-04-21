@@ -76,7 +76,7 @@ services:
       - prometheus
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/jaeger:2.0.0
     container_name: jaeger
     environment:
       - COLLECTOR_OTLP_ENABLED=true
