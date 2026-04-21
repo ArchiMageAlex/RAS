@@ -38,6 +38,16 @@ class PolicyEngine:
         """Оценивает политики переключения режима."""
         return self.core.evaluate_mode(salience_score)
 
+    def evaluate_escalation_policy(
+        self,
+        event: Event,
+        salience_score: SalienceScore,
+        current_mode: SystemMode,
+        active_tasks: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Оценивает политики эскалации к человеку."""
+        return self.core.evaluate_escalation(event, salience_score, current_mode, active_tasks)
+
     def _matches_conditions(self, conditions: Dict[str, Any], context: Dict[str, Any]) -> bool:
         """Устаревший метод, оставлен для совместимости."""
         # Делегируем ядру, но это не будет использоваться
