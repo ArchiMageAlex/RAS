@@ -23,6 +23,3 @@ opentelemetry-semantic-conventions==0.45b0
 structlog==24.1.0
 watchdog==3.0.0
 jsonschema==4.20.0
-psycopg2-binary==2.9.9
-slack-sdk==3.27.0
-croniter==2.0.2

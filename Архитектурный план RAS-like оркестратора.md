@@ -1,5 +1,38 @@
 # Архитектурный план реализации RAS-like оркестратора
 
+## 0. Текущий статус реализации (апрель 2026)
+
+Проект RAS Orchestrator активно развивается, многие компоненты из плана уже реализованы и находятся в рабочем состоянии. Ниже приведено соответствие между запланированными компонентами и текущей реализацией.
+
+### Реализованные компоненты (фазы 1 и 2)
+- **Event Ingestion Layer**: API Gateway (`ras_orchestrator/api_gateway/`), Event Bus (`ras_orchestrator/event_bus/`)
+- **Salience Engine**: модуль `ras_orchestrator/salience_engine/` с novelty detection, scoring, trust scoring
+- **Mode Manager**: `ras_orchestrator/mode_manager/` с поддержкой режимов и политик
+- **Interrupt Manager**: `ras_orchestrator/interrupt_manager/` с checkpointing и preemption
+- **Workspace/Blackboard**: `ras_orchestrator/workspace_service/` на основе Redis
+- **Policy Engine**: `ras_orchestrator/policy_engine/` с YAML политиками и REST API
+- **Task Orchestrator**: `ras_orchestrator/task_orchestrator/` с декомпозицией и delegation
+- **Базовый агент (Retriever)**: `ras_orchestrator/retriever_agent/`
+- **Homeostatic Controller**: `ras_orchestrator/homeostatic_controller/` для регуляции ресурсов
+- **Human Escalation**: `ras_orchestrator/human_escalation/` с workflow engine
+- **Predictive Engine**: `ras_orchestrator/predictive_engine/` для прогнозирования и proactive actions
+- **RL Agent**: `ras_orchestrator/rl_agent/` для обучения с подкреплением
+- **Observability**: полный стек Prometheus, Grafana, Loki в `ras_orchestrator/observability/`
+
+### Частично реализованные компоненты (фаза 3)
+- **Contextual bandits / hierarchical RL**: в стадии экспериментов
+- **Predictive processing loop**: реализован в predictive_engine
+- **Multimodal fusion**: планируется
+- **Automatic policy calibration**: в разработке
+
+### Актуальная документация
+Подробная документация по архитектуре, компонентам и deployment находится в директории [`ras_orchestrator/docs/`](../ras_orchestrator/docs/):
+- [Обзор архитектуры](../ras_orchestrator/docs/architecture/overview.md)
+- [Phase 2: Adaptive Attention](../ras_orchestrator/docs/architecture/phase2_adaptive_attention.md)
+- [Phase 3: Self-Optimizing](../ras_orchestrator/docs/architecture/phase3_self_optimizing.md)
+- [Компоненты](../ras_orchestrator/docs/architecture/components/)
+- [Deployment](../ras_orchestrator/docs/deployment/)
+
 ## 1. MVP-архитектура с core-компонентами
 
 ### 1.1. Event Ingestion Layer
@@ -80,42 +113,44 @@
 - **ONNX Runtime**: инференс моделей
 - **MLflow**: управление моделями и эксперименты
 
-## 3. Поэтапный план реализации
+## 3. Поэтапный план реализации (актуальный статус)
 
-### Фаза 1: Foundation (0–3 месяца)
+План реализации в значительной степени выполнен. Ниже приведено соответствие между исходным планом и текущим состоянием проекта.
+
+### Фаза 1: Foundation (реализована)
 **Цель**: базовые сервисы и event flow.
-- Развернуть event bus (Kafka) и нормализацию событий
-- Реализовать salience scoring (rule-based + простые ML-модели)
-- Создать workspace service (Redis)
-- Реализовать interrupt policy engine (YAML)
-- Построить task orchestrator с одним агентом (retriever)
-- Настроить observability (метрики, логи, трассировка)
-- Docker Compose для локального запуска
+- ✅ **Event bus (Kafka) и нормализация событий** – реализовано в `ras_orchestrator/event_bus/` и `ras_orchestrator/api_gateway/`
+- ✅ **Salience scoring** – реализовано в `ras_orchestrator/salience_engine/` с rule-based и ML-моделями
+- ✅ **Workspace service (Redis)** – `ras_orchestrator/workspace_service/`
+- ✅ **Interrupt policy engine (YAML)** – `ras_orchestrator/interrupt_manager/` и `ras_orchestrator/policy_engine/`
+- ✅ **Task orchestrator с одним агентом (retriever)** – `ras_orchestrator/task_orchestrator/` и `ras_orchestrator/retriever_agent/`
+- ✅ **Observability** – полный стек в `ras_orchestrator/observability/`
+- ✅ **Docker Compose** – `ras_orchestrator/docker-compose.yml` для локального запуска
 
-**Результат**: система умеет принимать события, оценивать значимость, прерывать задачи и выполнять простые retrieval-действия.
+**Результат**: система принимает события, оценивает значимость, прерывает задачи и выполняет retrieval-действия. Все компоненты работоспособны и покрыты тестами.
 
-### Фаза 2: Adaptive Attention (3–6 месяцев)
+### Фаза 2: Adaptive Attention (реализована)
 **Цель**: режимы, прерывания, память.
-- Внедрить mode manager с 4 режимами (low, normal, elevated, critical)
-- Добавить novelty/anomaly detection (autoencoders, drift detection)
-- Реализовать checkpoint/resume для прерываний
-- Расширить agent layer: critic, safety, executor
-- Внедрить trust scoring для источников и инструментов
-- Добавить temporal memory (эпизодическая память)
-- Настроить human escalation pipeline
+- ✅ **Mode manager с 4 режимами** – `ras_orchestrator/mode_manager/`
+- ✅ **Novelty/anomaly detection** – `ras_orchestrator/salience_engine/novelty_detector.py`
+- ✅ **Checkpoint/resume для прерываний** – `ras_orchestrator/interrupt_manager/checkpoint_integration.py`
+- ✅ **Расширение agent layer** – реализованы critic, safety, executor (частично в рамках других модулей)
+- ✅ **Trust scoring** – `ras_orchestrator/salience_engine/trust_scorer.py`
+- ✅ **Temporal memory** – `ras_orchestrator/salience_engine/historical_repository.py`
+- ✅ **Human escalation pipeline** – `ras_orchestrator/human_escalation/`
 
-**Результат**: система адаптирует уровень внимания, запоминает контекст, лучше управляет прерываниями и эскалациями.
+**Результат**: система адаптирует уровень внимания, запоминает контекст, управляет прерываниями и эскалациями. Компоненты интегрированы и протестированы.
 
-### Фаза 3: Self-Optimizing (6–12 месяцев)
+### Фаза 3: Self-Optimizing (в процессе реализации)
 **Цель**: обучение, адаптация, автономность.
-- Внедрить contextual bandits / hierarchical RL для динамической настройки порогов
-- Реализовать predictive processing loop (сравнение ожидаемого/наблюдаемого)
-- Добавить homeostatic control (учёт нагрузки, стоимости, качества)
-- Автоматическая калибровка политик на основе replay/evaluation
-- Multimodal fusion (текст, аудио, видео, сенсоры)
-- Production deployment с multi-zone, HA, autoscaling
+- 🔄 **Contextual bandits / hierarchical RL** – эксперименты в `ras_orchestrator/rl_agent/`
+- ✅ **Predictive processing loop** – реализован в `ras_orchestrator/predictive_engine/`
+- ✅ **Homeostatic control** – `ras_orchestrator/homeostatic_controller/`
+- 🔄 **Automatic policy calibration** – в разработке
+- 🔄 **Multimodal fusion** – планируется
+- ✅ **Production deployment** – настроен Kubernetes deployment (см. `ras_orchestrator/docs/deployment/`)
 
-**Результат**: система самооптимизируется, адаптируется к изменениям среды и демонстрирует устойчивое RAS-like поведение.
+**Результат**: система демонстрирует элементы самооптимизации, адаптируется к изменениям среды и продолжает развиваться в направлении полной RAS-like автономности.
 
 ## 4. Ключевые метрики успеха (KPI)
 

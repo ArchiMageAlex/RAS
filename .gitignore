@@ -1,0 +1,18 @@
+# Python
+ras_orchestrator/**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Логи
+logs/
+*.log
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

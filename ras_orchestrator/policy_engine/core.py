@@ -291,6 +291,8 @@ class PolicyEngineCore:
         self.policies: Dict[str, List[Policy]] = {}  # тип -> список политик
         self.watch = watch
         self.observer = None
+        self.rl_agent = None  # RL агент для динамической настройки порогов
+        self.rl_adjustments: Dict[str, float] = {}  # текущие корректировки от RL
         self._load_all_policies()
 
         if watch:
@@ -382,9 +384,32 @@ class PolicyEngineCore:
             }
         return {"should_interrupt": False, "reason": "no_policy_matched"}
 
+    def register_rl_agent(self, rl_agent):
+        """Регистрирует RL агента для динамической настройки порогов."""
+        self.rl_agent = rl_agent
+        logger.info("RL agent registered in PolicyEngineCore")
+
+    def apply_rl_adjustments(self, adjustments: Dict[str, float]):
+        """Применяет корректировки порогов от RL агента."""
+        self.rl_adjustments.update(adjustments)
+        logger.info(f"Applied RL adjustments: {adjustments}")
+
+    def _adjust_thresholds(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Корректирует пороги в контексте на основе RL корректировок."""
+        if not self.rl_adjustments:
+            return context
+        # Пример: корректируем пороги salience.aggregated
+        if "salience" in context and "aggregated" in context["salience"]:
+            original = context["salience"]["aggregated"]
+            adjustment = self.rl_adjustments.get("salience_threshold", 0.0)
+            # Применяем аддитивную корректировку (можно заменить на мультипликативную)
+            context["salience"]["aggregated_adjusted"] = original + adjustment
+        return context
+
     def evaluate_mode(self, salience_score: SalienceScore) -> Dict[str, Any]:
-        """Специализированная оценка для режимов."""
+        """Специализированная оценка для режимов с учётом RL корректировок."""
         context = {"salience": salience_score.dict()}
+        context = self._adjust_thresholds(context)
         matched = self.evaluate("mode", context)
         if matched:
             best = matched[0]
@@ -392,8 +417,9 @@ class PolicyEngineCore:
                 "target_mode": best.get("actions", {}).get("target_mode"),
                 "reason": best.get("actions", {}).get("reason", "policy_matched"),
                 "policy_name": best["policy_name"],
+                "rl_adjustments_applied": self.rl_adjustments,
             }
-        return {}
+        return {"rl_adjustments_applied": self.rl_adjustments}
 
     def evaluate_escalation(
         self,

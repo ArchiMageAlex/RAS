@@ -13,6 +13,14 @@ from common.models import Event, Severity
 
 logger = logging.getLogger(__name__)
 
+# Optional import for predictive engine integration
+try:
+    from predictive_engine import get_predictive_engine
+    PREDICTIVE_ENGINE_AVAILABLE = True
+except ImportError:
+    PREDICTIVE_ENGINE_AVAILABLE = False
+    get_predictive_engine = None
+
 
 class AnomalyDetector:
     """Простой детектор аномалий на основе статистики исторических событий."""
@@ -116,6 +124,7 @@ class AdvancedScoring:
         self,
         default_weights: Optional[Dict[str, float]] = None,
         event_type_weights: Optional[Dict[str, Dict[str, float]]] = None,
+        use_predictive_engine: bool = True,
     ):
         # Веса по умолчанию (как в engine.py)
         self.default_weights = default_weights or {
@@ -134,6 +143,15 @@ class AdvancedScoring:
         self.cache = SimilarityCache()
         self.anomaly_detector = AnomalyDetector()
         self.external_client = ExternalContextClient()
+        self.use_predictive_engine = use_predictive_engine and PREDICTIVE_ENGINE_AVAILABLE
+        self.predictive_engine = None
+        if self.use_predictive_engine:
+            try:
+                self.predictive_engine = get_predictive_engine()
+                logger.info("Predictive engine integrated into AdvancedScoring")
+            except Exception as e:
+                logger.warning(f"Failed to load predictive engine: {e}")
+                self.use_predictive_engine = False
 
     def compute_relevance(self, event: Event, context: Dict[str, Any]) -> float:
         """Релевантность с учётом внешнего контекста."""
@@ -156,14 +174,28 @@ class AdvancedScoring:
 
     def compute_novelty(self, event: Event, context: Dict[str, Any]) -> float:
         """
-        Новизна на основе исторической частоты и времени суток.
+        Новизна на основе исторической частоты, времени суток и прогноза от Predictive Engine.
         """
-        # Заглушка: можно интегрировать с хранилищем событий
         hour = context.get("time_of_day", 12)
-        # Ночью события считаем более новыми (меньше фонового шума)
+        base_novelty = 0.3
         if 0 <= hour < 6:
-            return 0.7
-        return 0.3
+            base_novelty = 0.7
+
+        # Корректировка на основе прогноза
+        if self.use_predictive_engine and self.predictive_engine:
+            try:
+                # Получаем прогноз для данного типа события
+                forecast = self.predictive_engine.get_recommended_actions(event.type)
+                if forecast and isinstance(forecast, list) and len(forecast) > 0:
+                    # Если прогноз указывает на аномальный рост, увеличиваем новизну
+                    for action in forecast:
+                        if action.get("type") == "anomaly_alert":
+                            base_novelty = min(1.0, base_novelty + 0.2)
+                            break
+            except Exception as e:
+                logger.debug(f"Predictive engine novelty adjustment failed: {e}")
+
+        return base_novelty
 
     def compute_risk(self, event: Event, context: Dict[str, Any]) -> float:
         """Риск с учётом системной нагрузки и типа события."""

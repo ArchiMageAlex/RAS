@@ -1,7 +1,7 @@
 from enum import Enum
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List, Tuple
-from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, List
+from datetime import datetime
 
 
 class EventType(str, Enum):
@@ -55,47 +55,3 @@ class Task(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     parameters: Dict[str, Any] = Field(default_factory=dict)
     result: Optional[Dict[str, Any]] = None
-
-
-# Phase 2: Novelty Detection
-class HistoricalEvent(BaseModel):
-    event_id: str
-    type: EventType
-    severity: Severity
-    source: str
-    timestamp: datetime
-    payload: Dict[str, Any]
-    novelty_score: Optional[float] = None
-
-
-# Phase 2: Checkpoint/Resume
-class TaskCheckpoint(BaseModel):
-    checkpoint_id: str
-    task_id: str
-    agent_type: str
-    state_data: bytes  # pickle-сериализованное состояние
-    created_at: datetime
-    expires_at: Optional[datetime]
-
-
-# Phase 2: Trust Scoring
-class SourceTrust(BaseModel):
-    source: str
-    trust_score: float = 0.5  # 0.0 – недоверенный, 1.0 – доверенный
-    events_count: int = 0
-    accuracy: float = 1.0     # Точность предыдущих предсказаний
-    last_updated: datetime
-
-
-# Phase 2: Human Escalation
-class EscalationStep(BaseModel):
-    action: str  # notify, wait_for_response, execute_script
-    parameters: Dict[str, Any]
-
-
-class EscalationWorkflow(BaseModel):
-    workflow_id: str
-    trigger_policy: str
-    steps: List[EscalationStep]
-    timeout_seconds: int
-    notify_channels: List[str]  # slack, email, pagerduty

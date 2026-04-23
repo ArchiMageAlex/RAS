@@ -3,7 +3,7 @@
 Использует новое ядро из core.py.
 """
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 from common.models import Event, SalienceScore, SystemMode
@@ -18,6 +18,13 @@ class PolicyEngine:
     def __init__(self, policy_dir: str = None, watch: bool = False):
         self.policy_dir = policy_dir or Path(__file__).parent / "policies"
         self.core = PolicyEngineCore(policy_dir=self.policy_dir, watch=watch)
+        self.rl_agent = None  # RL агент для динамической настройки порогов
+
+    def register_rl_agent(self, rl_agent):
+        """Регистрирует RL агента для динамической настройки порогов."""
+        self.rl_agent = rl_agent
+        self.core.register_rl_agent(rl_agent)
+        logger.info("RL agent registered in PolicyEngine")
 
     def _load_policies(self):
         """Загружает политики (делегирует ядру)."""
@@ -37,16 +44,6 @@ class PolicyEngine:
     def evaluate_mode_policy(self, salience_score: SalienceScore) -> Dict[str, Any]:
         """Оценивает политики переключения режима."""
         return self.core.evaluate_mode(salience_score)
-
-    def evaluate_escalation_policy(
-        self,
-        event: Event,
-        salience_score: SalienceScore,
-        current_mode: SystemMode,
-        active_tasks: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
-        """Оценивает политики эскалации к человеку."""
-        return self.core.evaluate_escalation(event, salience_score, current_mode, active_tasks)
 
     def _matches_conditions(self, conditions: Dict[str, Any], context: Dict[str, Any]) -> bool:
         """Устаревший метод, оставлен для совместимости."""
