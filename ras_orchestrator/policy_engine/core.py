@@ -421,6 +421,35 @@ class PolicyEngineCore:
             }
         return {"rl_adjustments_applied": self.rl_adjustments}
 
+    def evaluate_escalation(
+        self,
+        event: Event,
+        salience_score: SalienceScore,
+        current_mode: SystemMode,
+        active_tasks: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Оценивает политики эскалации к человеку."""
+        context = {
+            "event": event.dict(),
+            "salience": salience_score.dict(),
+            "current_mode": current_mode.value,
+            "active_task_count": len(active_tasks),
+            "event_severity": event.severity.value if hasattr(event.severity, 'value') else event.severity,
+            "event_type": event.event_type.value if hasattr(event.event_type, 'value') else event.event_type,
+        }
+        matched = self.evaluate("human_escalation", context)
+        if matched:
+            best = matched[0]  # highest priority
+            return {
+                "should_escalate": True,
+                "escalation_level": best.get("actions", {}).get("escalation_level", "medium"),
+                "notify_channels": best.get("actions", {}).get("notify_channels", []),
+                "timeout_seconds": best.get("actions", {}).get("timeout_seconds", 3600),
+                "policy_name": best["policy_name"],
+                "metadata": best.get("metadata", {}),
+            }
+        return {"should_escalate": False, "reason": "no_policy_matched"}
+
 
 # Глобальный экземпляр для удобства
 _global_engine: Optional[PolicyEngineCore] = None

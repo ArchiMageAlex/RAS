@@ -45,10 +45,6 @@ class PolicyEngine:
         """Оценивает политики переключения режима."""
         return self.core.evaluate_mode(salience_score)
 
-    def apply_rl_adjustments(self, adjustments: Dict[str, float]):
-        """Применяет корректировки порогов от RL агента."""
-        self.core.apply_rl_adjustments(adjustments)
-
     def _matches_conditions(self, conditions: Dict[str, Any], context: Dict[str, Any]) -> bool:
         """Устаревший метод, оставлен для совместимости."""
         # Делегируем ядру, но это не будет использоваться

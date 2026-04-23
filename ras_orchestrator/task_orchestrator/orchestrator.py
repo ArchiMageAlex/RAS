@@ -5,16 +5,19 @@ from datetime import datetime
 from common.models import Task, Event
 from workspace_service.redis_client import WorkspaceService
 from retriever_agent.agent import RetrieverAgent
+from .checkpoint_manager import CheckpointManager
+from .serialization import Checkpointable
 
 logger = logging.getLogger(__name__)
 
 
 class TaskOrchestrator:
-    """Оркестратор задач: создаёт задачи и назначает агентов."""
+    """Оркестратор задач: создаёт задачи и назначает агентов с поддержкой чекпоинтов."""
 
     def __init__(self, workspace: Optional[WorkspaceService] = None):
         self.workspace = workspace or WorkspaceService()
         self.retriever_agent = RetrieverAgent()
+        self.checkpoint_manager = CheckpointManager(workspace=self.workspace)
 
     def create_task(self, event: Event, task_type: str = "retrieval") -> Task:
         """Создаёт задачу на основе события."""
