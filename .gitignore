@@ -1,5 +1,5 @@
 # Python
-**/__pycache__/
+ras_orchestrator/**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
