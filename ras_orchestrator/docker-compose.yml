@@ -41,6 +41,32 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    environment:
+      POSTGRES_USER: ras_user
+      POSTGRES_PASSWORD: ras_password
+      POSTGRES_DB: ras_tsdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
+
+  mlflow:
+    image: dhi.io/mlflow:3
+    container_name: mlflow
+    environment:
+      MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+      - ./mlflow:/app/mlflow
+    command: server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlflow/artifacts
+    restart: unless-stopped
+
   # Observability Stack
   prometheus:
     image: prom/prometheus:latest
@@ -251,8 +277,86 @@ services:
       - ./retriever_agent:/app/retriever_agent
       - ./common:/app/common
 
+  predictive_engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m predictive_engine.main
+    depends_on:
+      - kafka
+      - redis
+      - timescaledb
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      TIMESCALEDB_HOST: timescaledb
+      TIMESCALEDB_PORT: 5432
+      TIMESCALEDB_DB: ras_tsdb
+      TIMESCALEDB_USER: ras_user
+      TIMESCALEDB_PASSWORD: ras_password
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: predictive-engine
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: prometheus
+    volumes:
+      - ./predictive_engine:/app/predictive_engine
+      - ./common:/app/common
+      - ./event_bus:/app/event_bus
+
+  homeostatic_controller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m homeostatic_controller.main
+    depends_on:
+      - kafka
+      - redis
+      - prometheus
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      PROMETHEUS_URL: http://prometheus:9090
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: homeostatic-controller
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: prometheus
+    volumes:
+      - ./homeostatic_controller:/app/homeostatic_controller
+      - ./common:/app/common
+      - ./event_bus:/app/event_bus
+
+  rl_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m rl_agent.main
+    depends_on:
+      - kafka
+      - redis
+      - mlflow
+      - timescaledb
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      TIMESCALEDB_HOST: timescaledb
+      TIMESCALEDB_PORT: 5432
+      TIMESCALEDB_DB: ras_tsdb
+      TIMESCALEDB_USER: ras_user
+      TIMESCALEDB_PASSWORD: ras_password
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: rl-agent
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: prometheus
+    volumes:
+      - ./rl_agent:/app/rl_agent
+      - ./common:/app/common
+      - ./event_bus:/app/event_bus
+
 volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
   loki_data:
+  timescaledb_data:
+  mlflow_data:

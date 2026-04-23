@@ -13,6 +13,15 @@ REQUIRED = [
     "yaml",
     "prometheus_client",
     "pythonjsonlogger",
+    "numpy",
+    "sklearn",
+    "torch",
+    "prophet",
+    "psycopg2",
+    "mlflow",
+    "pandas",
+    "statsmodels",
+    "matplotlib",
 ]
 
 def check():

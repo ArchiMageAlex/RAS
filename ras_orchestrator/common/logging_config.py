@@ -11,7 +11,7 @@ import os
 import json
 import logging
 import logging.handlers
-from datetime import datetime
+from datetime import datetime, UTC
 from pythonjsonlogger import jsonlogger
 
 # Уровни логирования по умолчанию
@@ -33,7 +33,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
     def add_fields(self, log_record, record, message_dict):
         super().add_fields(log_record, record, message_dict)
         # Добавляем timestamp в ISO формате
-        log_record["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        log_record["timestamp"] = datetime.now(UTC).isoformat() + "Z"
         log_record["level"] = record.levelname
         log_record["logger"] = record.name
         log_record["module"] = record.module

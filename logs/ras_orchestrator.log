@@ -1,0 +1,2 @@
+{"timestamp": "2026-04-23T08:53:51.047753+00:00Z", "level": "INFO", "logger": "root", "module": "logging_config", "function": "setup_logging", "message": "Logging configured", "taskName": null, "log_level": "INFO", "log_format": "json", "log_dir": "./logs", "line": 132}
+{"timestamp": "2026-04-23T08:53:51.066522+00:00Z", "level": "INFO", "logger": "root", "module": "logging_config", "function": "setup_logging", "message": "Logging configured", "taskName": null, "log_level": "INFO", "log_format": "json", "log_dir": "./logs", "line": 132}
