@@ -97,6 +97,7 @@ curl -X POST http://localhost:8000/events \
 
 ## Контакты
 
-- **GitHub Issues**: [https://github.com/your-org/ras-orchestrator/issues](https://github.com/your-org/ras-orchestrator/issues)
+- **GitHub Issues**: [https://github.com/archimagealex/RAS/issues](https://github.com/archimagealex/RAS/issues)
 - **Slack**: канал `#ras-documentation`
-- **Email**: docs@example.com
+- **Email**: archimagealex@gmail.com  
+- **Telegram**: @archimagealex

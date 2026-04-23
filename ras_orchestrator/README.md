@@ -19,7 +19,7 @@
 ### 1. Клонирование и настройка
 
 ```bash
-git clone https://github.com/your-org/ras-orchestrator.git
+git clone https://github.com/ArchiMageAlex/RAS.git
 cd ras_orchestrator
 ```
 
