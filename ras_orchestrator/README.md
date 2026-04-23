@@ -35,11 +35,16 @@ pip install -r requirements.txt
 - `redis` — workspace service
 - `prometheus-client` — метрики
 - `python-json-logger` — структурированное логирование
+- `numpy` — численные вычисления для ML компонентов
+- `scikit-learn` — алгоритмы машинного обучения для predictive engine
+- `structlog` — улучшенное структурированное логирование
 
 **Опциональные зависимости (для полной функциональности):**
 - `opentelemetry-*` — трассировка и метрики
 - `watchdog` — hot-reload политик
 - `jsonschema` — валидация YAML-политик
+- `kafka-python` — event bus (Kafka)
+- `pyyaml` — загрузка YAML-конфигураций
 
 ### 3. Запуск инфраструктуры (опционально)
 
@@ -113,6 +118,12 @@ curl http://localhost:8000/health
 | **Retriever Agent** | Базовый агент для выполнения задач retrieval |
 | **Event Bus** (Kafka) | Шина событий для асинхронной коммуникации |
 | **Observability Stack** | OpenTelemetry, Prometheus, Grafana, Jaeger для мониторинга |
+| **Homeostatic Controller** (фаза 3) | Поддержание гомеостаза системы через балансировку нагрузки, приоритизацию и масштабирование |
+| **Human Escalation** (фаза 2) | Эскалация событий к человеку, управление workflow уведомлений |
+| **Predictive Engine** (фаза 3) | Прогнозирование временных паттернов, proactive actions на основе ML |
+| **RL Agent** (фаза 3) | Reinforcement Learning для динамической настройки порогов и политик |
+| **Performance Optimizer** | Оптимизация производительности системы через анализ метрик |
+| **Integration Coordinator** | Координация интеграций с внешними системами (CI/CD, мониторинг) |
 
 ## 🔧 Технологический стек
 
@@ -186,16 +197,28 @@ pytest tests/ -v
 
 ## 📈 Roadmap
 
-### Фаза 2: Adaptive Attention
-- [ ] Novelty detection на основе historical events
-- [ ] Checkpoint/resume для длинных задач
-- [ ] Trust scoring для источников событий
-- [ ] Human escalation workflows
+### Фаза 2: Adaptive Attention (частично реализовано)
+- [x] Novelty detection на основе historical events (реализовано в `salience_engine/novelty_detector.py`)
+- [x] Checkpoint/resume для длинных задач (реализовано в `interrupt_manager/checkpoint_integration.py`)
+- [x] Trust scoring для источников событий (реализовано в `salience_engine/trust_scorer.py`)
+- [x] Human escalation workflows (реализовано в модуле `human_escalation/`)
 
-### Фаза 3: Self-Optimizing
-- [ ] Reinforcement Learning для динамической настройки порогов
-- [ ] Predictive processing на основе временных паттернов
-- [ ] Homeostatic control для баланса нагрузки
+### Фаза 3: Self-Optimizing (частично реализовано)
+- [x] Reinforcement Learning для динамической настройки порогов (реализовано в модуле `rl_agent/`)
+- [x] Predictive processing на основе временных паттернов (реализовано в модуле `predictive_engine/`)
+- [x] Homeostatic control для баланса нагрузки (реализовано в модуле `homeostatic_controller/`)
+
+### Дополнительные реализованные компоненты:
+- **Performance Optimizer** (`performance/optimizer.py`) — оптимизация производительности
+- **Integration Coordinator** (`integration/coordinator.py`) — координация интеграций
+- **Advanced Observability** — полный стек мониторинга (Prometheus, Grafana, Loki, Jaeger)
+- **Policy Engine расширения** — поддержка human escalation, routing политик
+
+### Планы на будущее (фаза 4):
+- Автоматическое обучение политик на основе RL
+- Мультимодальные источники событий (видео, аудио, сенсоры)
+- Распределённый оркестратор с горизонтальным масштабированием
+- Интеграция с внешними AI‑сервисами (OpenAI, Anthropic, локальные модели)
 
 ## 📄 Лицензия
 

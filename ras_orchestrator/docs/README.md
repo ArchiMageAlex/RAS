@@ -16,7 +16,15 @@
   - [Task Orchestrator](architecture/components/task_orchestrator.md)
   - [Retriever Agent](architecture/components/retriever_agent.md)
   - [Observability Stack](architecture/components/observability.md)
+  - [Homeostatic Controller](architecture/components/homeostatic_controller.md) (фаза 3)
+  - [Human Escalation](architecture/components/human_escalation.md) (фаза 2)
+  - [Predictive Engine](architecture/components/predictive_engine.md) (фаза 3)
+  - [RL Agent](architecture/components/rl_agent.md) (фаза 3)
+  - [Performance Optimizer](architecture/components/performance_optimizer.md)
+  - [Integration Coordinator](architecture/components/integration_coordinator.md)
 - [Data Model](architecture/data_model.md) — схемы событий, задач, политик, структуры БД.
+- [Фаза 2: Adaptive Attention](architecture/phase2_adaptive_attention.md) — детали реализации novelty detection, trust scoring, human escalation.
+- [Фаза 3: Self-Optimizing](architecture/phase3_self_optimizing.md) — детали реализации RL, predictive processing, homeostatic control.
 
 ### 2. API
 - [OpenAPI спецификация](api/openapi.yaml) — полная спецификация REST API в формате OpenAPI 3.0.
