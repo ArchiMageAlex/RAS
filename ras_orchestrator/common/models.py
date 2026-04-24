@@ -55,3 +55,34 @@ class Task(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     parameters: Dict[str, Any] = Field(default_factory=dict)
     result: Optional[Dict[str, Any]] = None
+
+
+class SystemMetrics(BaseModel):
+    """Метрики системы для RL-агента."""
+    cpu_load: float = Field(..., ge=0.0, le=1.0, description="Загрузка CPU (0-1)")
+    latency_ms: float = Field(..., ge=0.0, description="Задержка в миллисекундах")
+    error_rate: float = Field(..., ge=0.0, le=1.0, description="Частота ошибок (0-1)")
+    queue_depth: int = Field(..., ge=0, description="Глубина очереди задач")
+    memory_usage: float = Field(..., ge=0.0, le=1.0, description="Использование памяти (0-1)")
+    throughput: float = Field(..., ge=0.0, description="Пропускная способность (запросов/сек)")
+
+
+class RLState(BaseModel):
+    """Состояние системы для RL-агента."""
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    salience_scores: List[float] = Field(..., description="Список оценок значимости")
+    current_mode: SystemMode = Field(..., description="Текущий режим системы")
+    interrupt_decisions: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="История решений о прерываниях"
+    )
+    system_metrics: SystemMetrics = Field(..., description="Метрики системы")
+
+
+class RLAction(BaseModel):
+    """Действие RL-агента."""
+    action_type: str = Field(..., description="Тип действия (adjust_salience_weights и т.д.)")
+    parameters: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Параметры действия (delta, mode и др.)"
+    )
