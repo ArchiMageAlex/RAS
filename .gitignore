@@ -16,3 +16,4 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+ras_orchestrator/logs/ras_orchestrator.log

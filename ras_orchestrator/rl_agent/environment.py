@@ -58,8 +58,30 @@ class OrchestratorEnv:
         }
         return mapping.get(mode, 1.0)  # по умолчанию NORMAL
 
-    def _numeric_to_mode(self, numeric: float) -> SystemMode:
-        """Преобразует числовое значение обратно в SystemMode."""
+    def _numeric_to_mode(self, numeric) -> SystemMode:
+        """Преобразует числовое значение или строку обратно в SystemMode."""
+        # Если numeric - строка, попробуем преобразовать
+        if isinstance(numeric, str):
+            # Попробуем преобразовать строку в число
+            try:
+                numeric = float(numeric)
+            except ValueError:
+                # Если не число, попробуем сопоставить с именем режима
+                mapping = {
+                    "LOW": SystemMode.LOW,
+                    "NORMAL": SystemMode.NORMAL,
+                    "ELEVATED": SystemMode.ELEVATED,
+                    "CRITICAL": SystemMode.CRITICAL,
+                    "low": SystemMode.LOW,
+                    "normal": SystemMode.NORMAL,
+                    "elevated": SystemMode.ELEVATED,
+                    "critical": SystemMode.CRITICAL,
+                }
+                if numeric in mapping:
+                    return mapping[numeric]
+                else:
+                    raise ValueError(f"Unknown mode string: {numeric}")
+        # Теперь numeric должен быть числом (float или int)
         # Округляем до ближайшего целого для сопоставления
         if numeric <= 0.5:
             return SystemMode.LOW
@@ -144,8 +166,16 @@ class OrchestratorEnv:
                 self.mode_thresholds[mode_enum] += delta
                 self.mode_thresholds[mode_enum] = max(0.1, min(1.0, self.mode_thresholds[mode_enum]))
                 logger.debug(f"Adjusted threshold for {mode_enum.value} to {self.mode_thresholds[mode_enum]}")
-            except (ValueError, KeyError):
-                logger.warning(f"Invalid mode numeric {mode_numeric}")
+            except (ValueError, KeyError, TypeError) as e:
+                logger.warning(
+                    f"Invalid mode parameter: {mode_numeric} (type: {type(mode_numeric).__name__}), "
+                    f"error: {e}. Using default NORMAL mode."
+                )
+                # Можно применить к дефолтному режиму, чтобы избежать сбоя
+                mode_enum = SystemMode.NORMAL
+                self.mode_thresholds[mode_enum] += delta
+                self.mode_thresholds[mode_enum] = max(0.1, min(1.0, self.mode_thresholds[mode_enum]))
+                logger.debug(f"Adjusted threshold for {mode_enum.value} to {self.mode_thresholds[mode_enum]} after fallback")
 
         elif action.action_type == "adjust_interrupt_thresholds":
             delta = action.parameters.get("delta", 0.03)
