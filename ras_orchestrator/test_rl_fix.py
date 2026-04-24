@@ -26,7 +26,7 @@ def test_environment():
     # Создание действия с параметрами (смешанные типы)
     action = RLAction(
         action_type="adjust_mode_thresholds",
-        parameters={"mode": "NORMAL", "delta": 0.02}
+        parameters={"mode": 1.0, "delta": 0.02}
     )
     print(f"2. Действие создано: {action}")
     print(f"   Параметры: {action.parameters}, тип параметров: {type(action.parameters)}")

@@ -280,7 +280,7 @@ class TestRLAgent:
         """Тест выбора действия (exploration vs exploitation)."""
         state = RLState(
             system_mode="NORMAL",
-            metrics=SystemMetrics(cpu_usage=0.5, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput_rps=100),
+            metrics=SystemMetrics(cpu_load=0.5, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput=100.0, queue_depth=0),
             salience_aggregated=0.7,
             time_of_day=0.5
         )
@@ -303,7 +303,7 @@ class TestRLAgent:
         """Тест шага агента (взаимодействие со средой)."""
         state = RLState(
             system_mode="NORMAL",
-            metrics=SystemMetrics(cpu_usage=0.5, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput_rps=100),
+            metrics=SystemMetrics(cpu_load=0.5, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput=100.0, queue_depth=0),
             salience_aggregated=0.7,
             time_of_day=0.5
         )
@@ -324,14 +324,14 @@ class TestRLAgent:
         for i in range(10):
             state = RLState(
                 system_mode="NORMAL",
-                metrics=SystemMetrics(cpu_usage=0.5 + i*0.01, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput_rps=100),
+                metrics=SystemMetrics(cpu_load=0.5 + i*0.01, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput=100.0, queue_depth=0),
                 salience_aggregated=0.7,
                 time_of_day=0.5
             )
             action = RLAction(action_type="adjust_threshold", parameters={"delta": 0.1})
             next_state = RLState(
                 system_mode="NORMAL",
-                metrics=SystemMetrics(cpu_usage=0.51 + i*0.01, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput_rps=100),
+                metrics=SystemMetrics(cpu_load=0.51 + i*0.01, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput=100.0, queue_depth=0),
                 salience_aggregated=0.7,
                 time_of_day=0.5
             )
@@ -349,13 +349,13 @@ class TestRLAgent:
         """Тест тренировки эпизода."""
         rl_agent.env.reset = Mock(return_value=RLState(
             system_mode="NORMAL",
-            metrics=SystemMetrics(cpu_usage=0.5, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput_rps=100),
+            metrics=SystemMetrics(cpu_load=0.5, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput=100.0, queue_depth=0),
             salience_aggregated=0.7,
             time_of_day=0.5
         ))
         rl_agent.env.step = Mock(side_effect=[
-            (RLState(system_mode="NORMAL", metrics=SystemMetrics(cpu_usage=0.55, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput_rps=100), salience_aggregated=0.7, time_of_day=0.5), 0.5, False, {}),
-            (RLState(system_mode="NORMAL", metrics=SystemMetrics(cpu_usage=0.6, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput_rps=100), salience_aggregated=0.7, time_of_day=0.5), 0.3, True, {})
+            (RLState(system_mode="NORMAL", metrics=SystemMetrics(cpu_load=0.55, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput=100.0, queue_depth=0), salience_aggregated=0.7, time_of_day=0.5), 0.5, False, {}),
+            (RLState(system_mode="NORMAL", metrics=SystemMetrics(cpu_load=0.6, memory_usage=0.6, error_rate=0.02, latency_ms=150, throughput=100.0, queue_depth=0), salience_aggregated=0.7, time_of_day=0.5), 0.3, True, {})
         ])
         rl_agent.select_action = Mock(side_effect=[
             RLAction(action_type="adjust_threshold", parameters={"delta": 0.1}),

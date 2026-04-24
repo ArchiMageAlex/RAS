@@ -13,7 +13,8 @@ sys.path.insert(0, '.')
 from common.models import Event, EventType, Severity, SystemMode, Task
 from common.utils import setup_logging, EVENT_COUNTER, SALIENCE_SCORE_HISTOGRAM
 from salience_engine.engine import SalienceEngine
-from mode_manager.manager import ModeManager, SystemMetrics
+from mode_manager.manager import ModeManager
+from common.models import SystemMetrics
 from interrupt_manager.manager import InterruptManager
 from task_orchestrator.orchestrator import TaskOrchestrator
 from workspace_service.redis_client import WorkspaceService
