@@ -130,7 +130,7 @@ class RLAgent:
         if action_type == "adjust_salience_weights":
             return {"delta": 0.05}
         elif action_type == "adjust_mode_thresholds":
-            return {"mode": "NORMAL", "delta": 0.02}
+            return {"mode": 1.0, "delta": 0.02}
         elif action_type == "adjust_interrupt_thresholds":
             return {"delta": 0.03}
         return {}
