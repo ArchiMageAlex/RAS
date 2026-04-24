@@ -58,6 +58,18 @@ class OrchestratorEnv:
         }
         return mapping.get(mode, 1.0)  # по умолчанию NORMAL
 
+    def _numeric_to_mode(self, numeric: float) -> SystemMode:
+        """Преобразует числовое значение обратно в SystemMode."""
+        # Округляем до ближайшего целого для сопоставления
+        if numeric <= 0.5:
+            return SystemMode.LOW
+        elif numeric <= 1.5:
+            return SystemMode.NORMAL
+        elif numeric <= 2.5:
+            return SystemMode.ELEVATED
+        else:
+            return SystemMode.CRITICAL
+
     def reset(self) -> RLState:
         """Сбрасывает среду в начальное состояние."""
         self.step_count = 0
@@ -125,15 +137,15 @@ class OrchestratorEnv:
             logger.debug(f"Adjusted salience weight to {self.salience_weight}")
 
         elif action.action_type == "adjust_mode_thresholds":
-            mode = action.parameters.get("mode", "NORMAL")
+            mode_numeric = action.parameters.get("mode", 1.0)  # по умолчанию NORMAL = 1.0
             delta = action.parameters.get("delta", 0.02)
             try:
-                mode_enum = SystemMode(mode)
+                mode_enum = self._numeric_to_mode(mode_numeric)
                 self.mode_thresholds[mode_enum] += delta
                 self.mode_thresholds[mode_enum] = max(0.1, min(1.0, self.mode_thresholds[mode_enum]))
-                logger.debug(f"Adjusted threshold for {mode} to {self.mode_thresholds[mode_enum]}")
-            except ValueError:
-                logger.warning(f"Unknown mode {mode}")
+                logger.debug(f"Adjusted threshold for {mode_enum.value} to {self.mode_thresholds[mode_enum]}")
+            except (ValueError, KeyError):
+                logger.warning(f"Invalid mode numeric {mode_numeric}")
 
         elif action.action_type == "adjust_interrupt_thresholds":
             delta = action.parameters.get("delta", 0.03)

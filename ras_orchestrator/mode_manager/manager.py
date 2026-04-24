@@ -2,8 +2,7 @@ import logging
 from enum import Enum
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
-from dataclasses import dataclass
-from common.models import SystemMode, SalienceScore
+from common.models import SystemMode, SalienceScore, SystemMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -16,15 +15,6 @@ class ModeTransitionReason(str, Enum):
     POLICY = "policy"
     SYSTEM_METRICS = "system_metrics"
     COOLDOWN_EXPIRED = "cooldown_expired"
-
-
-@dataclass
-class SystemMetrics:
-    """Метрики системы для корректировки режима."""
-    cpu_load: float  # 0.0 - 1.0
-    latency_ms: float
-    error_rate: float  # 0.0 - 1.0
-    queue_depth: int
 
 
 class ModeStateMachine:

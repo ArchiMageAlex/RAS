@@ -3,8 +3,8 @@ Unit tests для Mode Manager.
 """
 import pytest
 from datetime import datetime, timedelta
-from common.models import SystemMode, SalienceScore
-from mode_manager.manager import ModeManager, SystemMetrics, ModeTransitionReason
+from common.models import SystemMode, SalienceScore, SystemMetrics
+from mode_manager.manager import ModeManager, ModeTransitionReason
 
 
 def test_mode_manager_initial():
